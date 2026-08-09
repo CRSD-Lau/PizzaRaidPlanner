@@ -1,0 +1,96 @@
+local PB = PizzaRaidPlanner
+PB.frame = CreateFrame("Frame")
+PB.roster, PB.byGUID, PB.byName, PB.petOwners = {}, {}, {}, {}
+PB.live = { active=false, vampires={}, completed={}, actualFirst=nil, frozenSource=nil }
+function PB:Print(msg) if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cffcc8844PizzaRaidPlanner:|r " .. tostring(msg)) end end
+function PB:Refresh()
+  if self.ScanRoster then self:ScanRoster() end
+  if self.UpdateUI then self:UpdateUI() end
+end
+
+-- UI and slash-command entry points use these wrappers so a partially loaded
+-- optional feature cannot produce an OnUpdate error loop. The normal history
+-- methods remain the primary path; current-raid planning is the fallback.
+function PB:GetSelectedFestergutHistoryEntrySafe()
+  if type(self.GetSelectedFestergutHistoryEntry)~="function" then return nil end
+  local ok,entry=pcall(self.GetSelectedFestergutHistoryEntry,self)
+  return ok and entry or nil
+end
+
+function PB:EnsureFestergutHistorySafe()
+  if type(self.EnsureFestergutHistory)~="function" then return {} end
+  local ok,history=pcall(self.EnsureFestergutHistory,self)
+  return ok and type(history)=="table" and history or {}
+end
+
+function PB:PrepareBPCPlanSafe()
+  if type(self.PrepareBPCPlanForUI)=="function" then
+    local ok,plan,err=pcall(self.PrepareBPCPlanForUI,self)
+    if ok then return plan,err end
+    return nil,"BPC planner failed: "..tostring(plan)
+  end
+  if type(self.BuildBPCPlan)=="function" then
+    local ok,plan,err=pcall(self.BuildBPCPlan,self)
+    if ok then return plan,err end
+    return nil,"BPC planner failed: "..tostring(plan)
+  end
+  return nil,"BPC planner module is unavailable. Use /reload; restart WoW if the addon was updated while the client was open."
+end
+
+function PB:PrepareBQLPlanSafe()
+  if type(self.PrepareBQLPlanForUI)=="function" then
+    local ok,plan,err=pcall(self.PrepareBQLPlanForUI,self)
+    if ok then return plan,err end
+    return nil,"BQL planner failed: "..tostring(plan)
+  end
+  if type(self.GeneratePlan)=="function" then
+    local ok,plan,err=pcall(self.GeneratePlan,self)
+    if ok then return plan,err end
+    return nil,"BQL planner failed: "..tostring(plan)
+  end
+  return nil,"BQL planner module is unavailable. Use /reload; restart WoW if the addon was updated while the client was open."
+end
+
+function PB:ClearFestergutHistorySelectionSafe(rebuild)
+  if type(self.ClearFestergutHistorySelection)=="function" then
+    local ok,result=pcall(self.ClearFestergutHistorySelection,self,rebuild)
+    if ok then return result end
+  end
+  if self.db then
+    self.db.selectedFestergutHistoryId=nil
+    if self.db.settings then self.db.settings.source="auto" end
+  end
+  if rebuild then
+    if self.BuildBPCPlan then self:BuildBPCPlan() end
+    if self.GeneratePlan then self:GeneratePlan() end
+  elseif self.ScanRoster then self:ScanRoster() end
+end
+
+function PB:SelectFestergutHistorySafe(id)
+  if type(self.SelectFestergutHistory)~="function" then
+    return nil,"Festergut history is unavailable. Use /reload; restart WoW if the addon was updated while the client was open."
+  end
+  local ok,result,err=pcall(self.SelectFestergutHistory,self,id)
+  if ok then return result,err end
+  return nil,"History load failed: "..tostring(result)
+end
+function PB:OnEvent(event, ...)
+  if event == "ADDON_LOADED" and ... == "PizzaRaidPlanner" then self:InitDB()
+  elseif event == "PLAYER_LOGIN" then
+    if self.UpdateICCState then self:UpdateICCState() end
+    self:Refresh()
+  elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" or event == "RAID_ROSTER_UPDATE" or event == "PARTY_MEMBERS_CHANGED" or event == "UNIT_PET" then
+    if (event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA") and self.UpdateICCState then self:UpdateICCState() end
+    self:Refresh()
+    if self.live.active and event~="UNIT_PET" and self.GeneratePlan then self:GeneratePlan(true) end
+  elseif event == "PLAYER_REGEN_DISABLED" then if self.StartAutomaticSegment then self:StartAutomaticSegment() end
+  elseif event == "PLAYER_REGEN_ENABLED" then if self.MarkCombatLeft then self:MarkCombatLeft() end
+  elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then if self.HandleCombatLog then self:HandleCombatLog(...) end
+  elseif event == "PLAYER_LOGOUT" then
+    if self.TouchICCSession then self:TouchICCSession() end
+    if self.BuildExports then self:BuildExports() end
+  end
+end
+for _,e in ipairs({"ADDON_LOADED","PLAYER_LOGIN","PLAYER_ENTERING_WORLD","ZONE_CHANGED_NEW_AREA","RAID_ROSTER_UPDATE","PARTY_MEMBERS_CHANGED","UNIT_PET","PLAYER_REGEN_DISABLED","PLAYER_REGEN_ENABLED","COMBAT_LOG_EVENT_UNFILTERED","PLAYER_LOGOUT"}) do PB.frame:RegisterEvent(e) end
+PB.frame:SetScript("OnEvent", function(_, event, ...) PB:OnEvent(event, ...) end)
+PB.frame:SetScript("OnUpdate", function(_, elapsed) if PB.Tick then PB:Tick(elapsed) end end)

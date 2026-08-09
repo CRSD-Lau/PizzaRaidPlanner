@@ -1,0 +1,12 @@
+* text=auto
+*.lua text eol=lf
+*.ps1 text eol=crlf
+*.vbs text eol=crlf
+*.gs text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.png binary
+*.gif binary
+*.tga binary
+*.ico binary

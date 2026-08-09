@@ -1,0 +1,36 @@
+# Local credentials and publisher state
+.env
+.env.*
+!.env.example
+**/SheetSync.json
+**/last-error.log
+**/last-sync.json
+**/last-upload.tsv
+**/credentials.json
+**/service-account*.json
+
+# WoW private data
+WTF/
+Logs/
+Errors/
+Screenshots/
+**/SavedVariables/
+*.lua.bak
+
+# Build and generated output
+dist/
+*.zip
+*.7z
+*.tar
+*.gz
+__pycache__/
+*.py[cod]
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.suo
+Thumbs.db
+Desktop.ini
+.DS_Store

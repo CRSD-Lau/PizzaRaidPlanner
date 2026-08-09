@@ -1,0 +1,23 @@
+## Interface: 30300
+## Title: Pizza Warriors Raid Planner
+## Notes: ICC Blood Prince and Blood Queen pre-raid planning for Wrath 3.3.5a.
+## Author: Neil Mitchell
+## Version: 1.0.0
+## OptionalDeps: ElvUI, Skada
+## SavedVariables: PizzaRaidPlannerDB, PizzaRaidPlannerExportDB
+Constants.lua
+Database.lua
+ICCSession.lua
+Core.lua
+Roster.lua
+Roles.lua
+SkadaAdapter.lua
+Segments.lua
+Damage.lua
+BQL.lua
+Optimizer.lua
+BPC.lua
+Encounter.lua
+Export.lua
+UI.lua
+Commands.lua

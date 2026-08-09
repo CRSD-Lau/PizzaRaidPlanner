@@ -1,0 +1,45 @@
+# In-game test checklist
+
+- [ ] Character-select AddOns shows **Pizza Warriors Raid Planner** enabled; `/prp help` prints usage without a Lua error.
+- [ ] Open `/prp`; verify the frame, title, accent, buttons, close button, and scrollbar follow the active global ElvUI style.
+- [ ] Mouse over every header/tab button. Confirm its border stays in the ElvUI accent color while hovered, the active tab remains accented after leaving it, and each tooltip clearly explains the tab.
+- [ ] In Dalaran, `/prp status` says `ICC tracking paused`; enter combat once and confirm no damage segment is saved.
+- [ ] Enter ICC and `/prp scan`; verify chat reports a new/resumed automatic DPS session and 25 roster names/classes/subgroups plus Skada-derived specs/roles where available.
+- [ ] After the first recognized boss, `/prp status` says `ICC tracking ACTIVE`. Before Festergut, confirm BPC/BQL warn that their required Festergut benchmark is missing instead of substituting another boss.
+- [ ] Complete normal trash between bosses and confirm it never appears in **DPS Sources**.
+- [ ] Kill Festergut and open **DPS Sources**. Confirm one dated Festergut row appears with difficulty, duration, and recorded raid count.
+- [ ] In **Copy BPC**, confirm Kinetic 1/2 are Hunters and Kinetic 3 is the strongest available Warlock with no unassigned-Kinetic warning.
+- [ ] Confirm **Copy BQL** prints the shared staging ranges `A55:Q62`, `A64:H73`, and `A76:G79`.
+- [ ] Confirm the Pizza Warriors emblem appears at the left side of the header without covering the title or version.
+- [ ] Select that row and confirm historical mode is clearly shown. Open **BQL Review**, **Copy BPC**, and **Copy BQL** and verify all three use that row's Festergut DPS and roster. Click **Current Raid** and confirm historical mode clears.
+- [ ] `/reload` while inside ICC; confirm the same session/sample count resumes. Briefly leave and re-enter ICC and confirm it still resumes.
+- [ ] Before BPC, run `/prp publish bpc`; confirm H1-H5, M1-M10, R1-R10, three Hunters for Kinetics, and detected Paladins for DSac/Fire AM. Confirm no R11 label or row exists.
+- [ ] Confirm the BPC export and Discord heading clearly say `Valanar Active / Empowered Shock Vortex`; these are not generic positions for every empowered Prince.
+- [ ] Confirm Balance Druids occupy R9, R10, then R8 and the review explains that Starfall is being kept away from Keleseth's Dark Nuclei/orb area.
+- [ ] Confirm the two highest Festergut-output Hunters occupy R2 and R7 and lead the Kinetic order unless a manual utility priority overrides it.
+- [ ] Apart from the deliberate R7 Hunter and reserved Balance Druid slots, confirm non-reserved ranged DPS follow the Festergut benchmark: the strongest use R3 then R1 and the lower remaining players fill the unused R4-R7 positions. A missing Festergut sample must be flagged rather than replaced by an ICC average.
+- [ ] Confirm protected BPC melee use M1/M2/M6/M7 and the rest of a normal eight-player footprint uses M4/M5/M8/M9. Verify M3 and M10 stay blank unless a ninth and tenth melee-position occupant exist.
+- [ ] Confirm tanks are detected but omitted from the BPC M block. Confirm M1/M2/M6/M7 mix top output with players lacking Sprint, Charge/Intercept, or Feral Charge; mobile/lower-priority DPS should normally be in the recovery set.
+- [ ] Confirm a Holy Paladin appears as a ranged healer, a Protection Paladin as a melee tank, and a Retribution Paladin as melee DPS in the role/spec review.
+- [ ] Paste the BPC TSV into `'WoW TSV Dump'!A1`. Copy `A1:F10`, click `'Blood Prince Council'!A6`, and press **Ctrl+Shift+V**; verify H1-H5, M1-M10, and R1-R10 fill through `F15` without changing formatting.
+- [ ] Copy `'WoW TSV Dump'!A13:F15`, click `'Blood Prince Council'!A20`, and press **Ctrl+Shift+V**; verify Kinetics, Divine Sacrifice, and Fire Aura Mastery fill through `F22`.
+- [ ] Before BQL, run `/prp status`; confirm both BPC and BQL use Festergut. Then run `/prp publish` and verify no ICC-average value is mixed into the exported order.
+- [ ] Confirm a competent Mage is preferred for R1 and R4 is the strongest remaining Festergut ranged performer, even when that is a Demonology Warlock rather than the second Mage.
+- [ ] Confirm R1's first bite is R4. R4 starts beside R1 near center-left and receives the correct Blink, Demonic Circle, or movement instruction before establishing the right-side chain.
+- [ ] Confirm R1/R2/R3/R5 are treated as left, R4 transitions right, R6-R10 are right, and the ranged layout ends at R10.
+- [ ] Confirm Boomkins/Warlocks favor center slots, Hunters favor back/edge slots, healers fill H1-H5, and melee fill Left/Middle/Right groups.
+- [ ] With the typical 5 healer + 10 ranged DPS + 8 melee DPS raid, confirm the two tanks do not consume BQL group cells, every Rogue and Retribution Paladin is in Middle, and every other melee DPS is on Left or Right.
+- [ ] Confirm the first four vampires are ranged; the only planned cross-lane ranged assignment is R1 → R4; every later ranged biter/target lane matches; melee appear only after ranged.
+- [ ] Confirm no melee Rogue or Retribution Paladin is assigned Left/Right and no other melee DPS is assigned Middle.
+- [ ] Confirm Shadow AM contains up to four Paladins. Without manual utility priorities, Airphase DSac should put a capable Paladin tank first, a different non-first-Shadow-AM Paladin second when possible, and the first Shadow AM holder in Emergency. Confirm `/prp utility` overrides this order.
+- [ ] Paste the BQL TSV into `'WoW TSV Dump'!A55`. Copy `A55:Q62` to `'Blood Queen Lana'Thel'!A28` with **Ctrl+Shift+V**; verify the initial target and every bite wave fill exactly through `Q35`.
+- [ ] Copy `'WoW TSV Dump'!A64:H73` to `'Blood Queen Lana'Thel'!N6` and `A76:G79` to `N20`, both with **Ctrl+Shift+V**; verify positions/groups fill through `U15` and cooldown rotations through `T23` without touching headings.
+- [ ] While solo after a raid night, run `/prp test last bpc` and `/prp test last bql`; confirm each command rebuilds from the dedicated saved full-raid roster and then restores the actual live roster. Reload once and open the planner while solo, then confirm the saved-raid commands still work.
+- [ ] Use the main sheet's existing action and verify the reviewed plan publishes to Discord channel `raid-postions`.
+- [ ] If a talent is unresolved, test `/prp capability <player> am|dsac on`, regenerate, then `clear`. Test `/prp competent <mage> on|off|clear` once.
+- [ ] Verify Hunter/Warlock/DK pet damage and a summoned guardian map to their owner.
+- [ ] Confirm BQL events do not enable live mode by themselves. Optionally arm `/prp live on`; verify an unexpected first Essence recipient re-roots the review tree and completed bites remain fixed.
+- [ ] Open `/prp`, click the top-right X, and confirm the entire planner window closes.
+- [ ] Confirm BQL itself can be retained in `/prp source list` after a pull but does not increase the ICC running-average sample count. Inspect the client Lua-error display after every step.
+- [ ] After `/reload` or logout, optionally run `tools\Export-PizzaRaidPlanner.ps1` and inspect its five files.
+- [ ] Enable `/prp debug on` during one BQL pull and retain evidence for any Warmane-specific unknown spell/aura event.

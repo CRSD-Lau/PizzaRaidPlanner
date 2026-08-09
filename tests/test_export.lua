@@ -1,0 +1,10 @@
+local PB=PizzaRaidPlanner
+PizzaRaidPlannerDB=nil; PizzaRaidPlannerExportDB=nil; PB:InitDB(); PB.roster={{guid="P1",name="A\tBad\nName",normalizedName="a bad name",classToken="MAGE",online=true,connected=true,dead=false,subgroup=1,position="ranged",damage=1,bossDamage=1,dps=1,expectedDPS=1,confidence="Good",dataSource="test"}}; PB.byGUID={P1=PB.roster[1]}; PB.byName={}; PB.live={active=false,vampires={},completed={}}; PB.GetSelectedSource=function() return {id="seg",targetName="Boss",duration=60,confidence="Good"} end; PB.ResolveRole=function() return "dps" end; PB.IsEligible=function() return true,"Eligible" end; PB.ScanRoster=function() end
+PB.db.latestPlan={generatedAt=1000,encounter="Blood-Queen Lana'thel",mode="planned",source=PB:GetSelectedSource(),assignments={{wave=0,slot=1,biter="BQL",biterSlot="Boss",biterLane="center",target="A\tBad",targetGUID="P1",targetSlot="R1",targetLane="left",targetDepth="front",targetPosition="ranged",movement="test",status="planned"}},waves={[0]={{target="A"}}},flatPriority={},completedAssignments={},warnings={},composition={positions={{type="ranged",slot="R1",slotNumber=1,lane="left",depth="front",player=PB.roster[1]}},ranged={{type="ranged",slot="R1",slotNumber=1,lane="left",depth="front",player=PB.roster[1]}},healers={},melee={},utility={shadowAM={},dsac={}},byGUID={}}}
+local t=PB:PlanRows(function(x) return tostring(x):gsub("[\r\n\t]"," ") end); assert(not t:find("\tBad"),"TSV sanitization")
+assert(t:find("POSITION") and t:find("BITE"),"combined sheet rows")
+for line in t:gmatch("[^\n]+") do local _,tabs=line:gsub("\t",""); assert(tabs==29,"fixed 30-column planner schema") end
+local c=PB:RosterRows(function(x) local v=tostring(x):gsub("[\r\n\t]"," "); return '"'..v:gsub('"','""')..'"' end); assert(c:find('A Bad Name'),"CSV sanitization")
+local j=PB:JSON({a="x\"y",b={1,true}}); assert(j:find('\\"'),"JSON escaping")
+PB:BuildExports(); assert(PizzaRaidPlannerExportDB.planTSVB64 and #PizzaRaidPlannerExportDB.planTSVB64>0,"persisted worksheet export field")
+print("test_export: OK")

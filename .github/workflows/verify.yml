@@ -1,0 +1,80 @@
+name: Verify and package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the approved source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua5.1
+
+      - name: Run the secret gate
+        shell: pwsh
+        run: ./scripts/Test-PublicRepository.ps1
+
+      - name: Run Lua planner tests
+        run: lua5.1 ./tests/run_tests.lua
+
+      - name: Parse production Lua
+        run: |
+          for file in ./*.lua; do
+            npx --yes luaparse@0.3.1 --quiet "$file"
+          done
+
+      - name: Run Apps Script tests
+        run: node ./tests/test_discord_post.js
+
+      - name: Run desktop publisher tests
+        shell: pwsh
+        run: ./tests/test_sheet_sync.ps1
+
+      - name: Build release archives
+        shell: pwsh
+        run: ./scripts/Build-Release.ps1
+
+      - name: Retain verified release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: PizzaRaidPlanner-release
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the approved source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build release archives
+        shell: pwsh
+        run: ./scripts/Build-Release.ps1
+
+      - name: Publish immutable release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}"
+          dist/PizzaRaidPlanner-Addon-*.zip
+          dist/PizzaRaidPlanner-Desktop-*.zip
+          dist/SHA256SUMS.txt
+          --verify-tag
+          --generate-notes
+          --title "Pizza Warriors Raid Planner ${GITHUB_REF_NAME}"
