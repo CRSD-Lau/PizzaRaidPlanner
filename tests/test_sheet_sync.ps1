@@ -1,5 +1,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+  $env:LOCALAPPDATA = [IO.Path]::GetTempPath()
+}
 . "$PSScriptRoot\..\tools\Sync-PizzaRaidPlannerToSheets.ps1"
 
 $bpc = New-Object 'System.Collections.Generic.List[string]'
