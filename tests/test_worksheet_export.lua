@@ -49,30 +49,34 @@ local leftMelee=ret
 local rightMelee=player("RogueOne","ROGUE",260,"dps","melee")
 local healerAssignment={type="healer",slot="H1",slotNumber=1,lane="center",depth="middle",player=holy}
 local rangedOne={type="ranged",slot="R1",slotNumber=1,lane="left",depth="front",player=mage}
-local rangedTwo={type="ranged",slot="R4",slotNumber=4,lane="right",startLane="left",depth="front",player=hunter}
+local rangedTwo={type="ranged",slot="R6",slotNumber=6,lane="right",startLane="right",returnLane="right",depth="front",player=hunter}
 local meleeLeft={type="melee",slot="M1",slotNumber=1,groupOrder=1,lane="left",depth="boss",player=leftMelee}
 local meleeRight={type="melee",slot="M2",slotNumber=2,groupOrder=1,lane="right",depth="boss",player=rightMelee}
-local composition={healers={healerAssignment},ranged={rangedOne,rangedTwo},melee={meleeLeft,meleeRight},positions={healerAssignment,rangedOne,rangedTwo,meleeLeft,meleeRight},utility={shadowAM={{player=holy}},dsac={{player=holy}}}}
+local azyia={name="Azyia"}; local pasyon={name="Pasyon"}; local mothrmonster={name="Mothrmonster"}; local krawl={name="Krawl"}; local lausudo={name="Lausudo"}
+local composition={healers={healerAssignment},ranged={rangedOne,rangedTwo},melee={meleeLeft,meleeRight},positions={healerAssignment,rangedOne,rangedTwo,meleeLeft,meleeRight},utility={shadowAM={{player=azyia},{player=pasyon},{player=mothrmonster},{player=krawl}},dsac={{player=lausudo},{player=mothrmonster}}}}
 PB.db.latestPlan={generatedAt=1000,encounter="Blood-Queen Lana'thel",source={targetName="Festergut"},composition=composition,waves={
   [0]={{target="MageOne"}},
-  [1]={{biter="MageOne",target="HunterOne"}},
-  [2]={{biter="MageOne",target="RetPala"},{biter="HunterOne",target="RogueOne"}},
+  [1]={{biter="MageOne",target="HunterOne",movement="HunterOne comes to MageOne, then returns to R6.",routeLabel="R6 TO R1 > HOME R"}},
+  [2]={{biter="MageOne",target="RetPala",routeLabel="MDPS SEED L"},{biter="HunterOne",target="RogueOne",movement="RogueOne comes to the stationary HunterOne on the right.",routeLabel="MDPS SEED R"}},
 },assignments={},warnings={}}
 
 local bqlText=PB:BQLWorksheetRows(function(v) return tostring(v or "") end)
 local bql=rows(bqlText)
-assert(bql[1][1]=="MageOne" and bql[1][5]=="MageOne -> HunterOne","BQL initial and first handoff in the visible-tab bite shape")
-assert(bql[1][9]=="MageOne -> RetPala","BQL next-wave first assignment")
-assert(bql[2][9]=="HunterOne -> RogueOne","BQL next-wave second assignment")
+assert(bql[1][1]=="MageOne" and bql[1][5]=="MageOne -> HunterOne","BQL initial and cross-side second bite appear exactly once without route annotations")
+assert(bql[1][9]=="MageOne -> RetPala","BQL third bite seeds left melee without route annotations")
+assert(bql[2][9]=="HunterOne -> RogueOne","BQL third bite seeds right melee without route annotations")
+assert(bql[2][1]=="" and bql[2][5]=="","BQL worksheet does not duplicate the initial vampire or opening handoff")
 assert(bql[1][19]:find("A55:Q62",1,true) and bql[1][19]:find("A28:Q35",1,true),"BQL bite helper uses the shared dump tab row-55 anchor")
 assert(bql[10][1]=="H1" and bql[10][2]=="HolyPala" and bql[10][3]=="" and bql[10][4]=="R1" and bql[10][5]=="MageOne" and bql[10][6]=="" and bql[10][7]=="L1" and bql[10][8]=="RetPala","BQL A10:H19 group block")
-assert(bql[13][4]=="R4" and bql[13][5]=="HunterOne","BQL position block carries the R4 secondary anchor")
+assert(bql[11][4]=="R2" and bql[11][5]=="—" and bql[15][4]=="R6" and bql[15][5]=="HunterOne","BQL position block carries the secondary anchor at the physical right-side R6 home")
 assert(bql[10][10]:find("A64:H73",1,true) and bql[22][9]:find("A76:G79",1,true),"BQL group and cooldown helpers follow the shifted shared-dump coordinates")
 assert(bql[11][7]=="R1" and bql[11][8]=="RogueOne","BQL melee sides are compact and labelled")
 assert(bql[19][4]=="R10" and bql[20][1]=="" and bql[20][4]=="","BQL position block ends at R10 and leaves the next row blank")
 assert(bql[10][10]:find("A64:H73",1,true) and bql[10][10]:find("N6:U15",1,true),"BQL visible-tab group destination instruction")
-assert(bql[22][1]=="1st" and bql[22][2]=="HolyPala" and bql[22][3]=="" and bql[22][4]=="Shadow AM" and bql[22][5]=="1st" and bql[22][6]=="" and bql[22][7]=="HolyPala","BQL A22:G25 utility block")
-assert(bql[24][5]=="Emergency" and bql[25][5]=="","BQL utility labels preserve emergency and empty fourth row")
+assert(bql[22][1]=="1st" and bql[22][2]=="Azyia" and bql[22][3]=="" and bql[22][4]=="AM" and bql[22][5]=="1st / 2nd" and bql[22][6]=="" and bql[22][7]=="Azyia / Pasyon","BQL A22:G25 begins the exact manual cooldown timeline")
+assert(bql[23][1]=="2nd" and bql[23][2]=="Pasyon" and bql[23][5]=="3rd" and bql[23][7]=="Mothrmonster","P1 and P2 link rotations use Shadow AM only")
+assert(bql[24][1]=="3rd / 4th" and bql[24][2]=="Mothrmonster / Krawl" and bql[24][4]=="AM" and bql[24][5]=="AIR" and bql[24][7]=="Mothrmonster","second air phase uses the second DSac")
+assert(bql[25][1]=="AIR" and bql[25][2]=="Lausudo" and bql[25][4]=="DSAC" and bql[25][5]=="1st / 2nd" and bql[25][7]=="Krawl / Azyia","first air phase uses DSac and P3 returns to Shadow AM with standardized link numbering")
 assert(bql[22][9]:find("A76:G79",1,true) and bql[22][9]:find("N20:T23",1,true),"BQL visible-tab utility destination instruction")
 for _,r in ipairs(bql) do assert(#r==19,"BQL worksheet keeps fixed nineteen-column shape") end
 print("test_worksheet_export: OK")

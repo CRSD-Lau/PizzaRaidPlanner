@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.1 - 2026-08-13
+
+- Renumbered BPC melee center-out in symmetric pairs: M1/M2 retain Retribution priority, M3/M4 use Festergut output and return mobility, M5-M8 complete the normal eight-player footprint, and M9/M10 are now the obvious far-edge overflow pair.
+- Rebuilt BQL melee groups around encounter mechanics: Rogues and DPS Death Knights are hard-assigned Middle, adequately performing Ferals also use Middle for rear attacks, Retribution Paladins stay on the sides, and low-output Ferals may use a side.
+- Rebuilt the BQL tree around encounter progression: the second bite spreads ranged Left to Right, the third bite seeds one melee vampire per side, and the fourth bite establishes two ranged plus two melee branches per side whenever the roster permits it.
+- Made the chaotic final rounds prefer same-role, same-side pairings before same class/spec, allowing local Hunter-to-Hunter, Shadow-to-Shadow, Balance-to-Balance, and equivalent visual matches. Repeated ranged classes/specs form local pairs, with four of one kind split two per side.
+- Kept biters planted and DPSing: every target comes to the assigned vampire, receives the focus bite, and returns home. The second vampire now owns the physically right-side R6 position, comes to stationary R1 for the second bite, then returns to R6 as the right ranged anchor.
+- Added export and 25-player regression coverage for the ranged-to-melee third bite, balanced four-branch setup, strict final-round role/side preservation, same-class matching, stationary biters, and target return routes.
+- Replaced the old generic cooldown rotation with the approved four-links / air / three-links / air / two-links cadence: Shadow AM covers Pact of the Darkfallen links only, and Divine Sacrifice covers Bloodbolt Whirl air phases only. Incite Terror and bite rounds no longer receive invented cooldown assignments.
+- Updated the BQL worksheet position, bite, and cooldown blocks to match these rules while retaining the existing fixed paste ranges and desktop publisher contract. Bite cells now contain only `Biter -> Target`; route annotations remain internal review data.
+- Rebuilds a persisted Festergut-history selection on login so a rule update cannot leave the desktop publisher reading an older cached BPC/BQL plan from SavedVariables.
+- Converts only detected outer white margins in the native 4096px Discord PNGs to transparency, preserving the full canvas dimensions and every visible raid-plan pixel.
+
 ## 1.0.0 - 2026-08-08
 
 - First public release of Pizza Warriors Raid Planner.

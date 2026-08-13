@@ -97,7 +97,7 @@ function PB:Command(input)
     elseif p and tonumber(value) then self.db.utilityPriorities[p.normalizedName]=tonumber(value); self:GeneratePlan()
     else self:Print("Usage: /prp utility <player> <integer>|clear") end
   elseif cmd=="rules" then
-    self:Print("BQL: competent Mage R1; R1 bites strongest remaining ranged at R4; R4 transitions right; same-side chains; top Rogue left for Tricks; R10 is final. BPC Valanar active: Boomkins R9/R10/R8; top Hunter R2, second Hunter R7; non-reserved ranged use Festergut order with R3 then R1 preferred and lower output in R4-R7; melee preferred M1/M2/M6/M7; M3/M10 overflow only.")
+    self:Print("BQL: targets come to stationary biters and return home. R1-R5 are left and R6-R10 are right. The second bite sends R6 to stationary R1, then R6 returns home as the right anchor; the third bite seeds one melee vampire per side. The last two rounds prefer same role, same side, then same class/spec (Hunter-Hunter, Shadow-Shadow, Balance-Balance). Shadow AM covers Pact links; DSac covers Bloodbolt Whirl only. Rogues and all DPS DKs use Middle, strong Ferals also use Middle, Rets stay on the sides, and melee groups remain balanced where hard constraints permit. BPC Valanar active: Boomkins R9/R10/R8; top Hunter R2, second Hunter R7; lower ranged use R4-R7; melee numbers run center-out, Rets favor M1/M2, and M9/M10 are overflow only.")
   elseif cmd=="test" and (a[2] or ""):lower()=="last" then
     local kind=(a[3] or "bql"):lower()
     if kind~="bpc" and kind~="bql" then self:Print("Usage: /prp test last bpc|bql"); return end

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release 1.0.0" src="https://img.shields.io/badge/release-1.0.0-f97316?style=flat-square">
+  <img alt="Release 1.0.1" src="https://img.shields.io/badge/release-1.0.1-f97316?style=flat-square">
   <img alt="WoW 3.3.5a" src="https://img.shields.io/badge/WoW-3.3.5a-2563eb?style=flat-square">
   <img alt="Source available" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-7c3aed?style=flat-square">
   <img alt="Contributions closed" src="https://img.shields.io/badge/contributions-closed-64748b?style=flat-square">
@@ -38,8 +38,10 @@ Pizza Warriors Raid Planner captures raid composition and damage evidence inside
 |---|---|
 | **Festergut history** | Persistent DPS and roster snapshots that can be selected for rehearsal |
 | **Blood Prince Council** | Valanar-active positions, Kinetic Bomb coverage, Divine Sacrifice, and Fire Aura Mastery |
-| **Blood-Queen Lana'thel** | Position-aware bite tree, healer/ranged placement, Rogue/Paladin Middle reservations, Left/Right assignment for other melee, Shadow AM, and Airphase DSac |
-| **Desktop publisher** | Values-only workbook updates plus crisp 4K BPC/BQL Discord images |
+| **Blood-Queen Lana'thel** | Position-aware bite tree, R1/R6 ranged anchors, Rogue/DPS-DK Middle rules, side Retribution groups, Pact Shadow AM, and Airphase DSac |
+| **Desktop publisher** | Values-only workbook updates plus crisp 4K BPC/BQL Discord images with transparent outer margins |
+
+The BQL tree uses the second bite to establish the opposite ranged side, the third bite to seed one melee branch per side, and the final rounds to prefer same-role, same-side, then same-class/spec pairings. Bite targets move to stationary biters and return home afterward. Persisted Festergut selections are rebuilt on login so an older cached plan cannot survive a rules update.
 
 ## System map
 

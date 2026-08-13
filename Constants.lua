@@ -1,8 +1,8 @@
 PizzaRaidPlanner = PizzaRaidPlanner or {}
 local PB = PizzaRaidPlanner
 
-PB.VERSION = "1.0.0"
-PB.SCHEMA_VERSION = 11
+PB.VERSION = "1.0.1"
+PB.SCHEMA_VERSION = 12
 PB.MAX_SEGMENTS = 20
 PB.MAX_FESTERGUT_HISTORY = 52
 PB.SEGMENT_GRACE = 8
@@ -70,9 +70,10 @@ PB.SPEC_ROLES = {
 PB.RANGED_SPECS = { [62]=true,[63]=true,[64]=true,[65]=true,[102]=true,[105]=true,[253]=true,[254]=true,[255]=true,[256]=true,[257]=true,[258]=true,[262]=true,[264]=true,[265]=true,[266]=true,[267]=true }
 PB.HEALER_SPECS = { [65]=true,[105]=true,[256]=true,[257]=true,[264]=true }
 PB.TANK_SPECS = { [66]=true,[73]=true,[104]=true }
--- BPC worksheet topology from the raid team's actual position image. M1, M2,
--- M6, and M7 are the protected boss-return positions. An eight-melee-DPS layout
--- then uses M4, M5, M8, and M9; M3 and M10 are distant overflow positions.
+-- BPC melee labels run center-out in left/right pairs: M1/M2 are closest,
+-- M3/M4 are the next protected pair, M5-M8 complete the normal eight-player
+-- footprint, and M9/M10 are the far-edge overflow pair. M1/M2 first protect
+-- Retribution Vengeance uptime; M3/M4 then use output and return mobility.
 -- Balance Druids remain reserved in the preferred R9/R10/R8 area. R3 then R1
 -- are the best unreserved ranged positions; R4-R7 are the difficult range band.
 -- The worksheet and room plan permanently stop at R10.
@@ -80,8 +81,8 @@ PB.BPC_BOOMKIN_SLOTS = { 9, 10, 8 }
 PB.BPC_HUNTER_SLOTS = { 2, 7 }
 PB.BPC_RANGED_ACCESSIBLE_SLOTS = { 3, 1, 2, 8, 9, 10 }
 PB.BPC_RANGED_DIFFICULT_SLOTS = { 4, 5, 6, 7 }
-PB.BPC_MELEE_PREFERRED_SLOTS = { 1, 2, 6, 7 }
-PB.BPC_MELEE_RECOVERY_SLOTS = { 4, 5, 8, 9, 3, 10 }
+PB.BPC_MELEE_PREFERRED_SLOTS = { 1, 2, 3, 4 }
+PB.BPC_MELEE_RECOVERY_SLOTS = { 5, 6, 7, 8, 9, 10 }
 -- One shared WoW TSV Dump tab: BPC occupies rows 1-53, row 54 is the
 -- deliberate spacer, and the BQL export begins at row 55.
 PB.WORKSHEET_BPC_LAST_ROW = 53

@@ -37,6 +37,8 @@ PB.UpdateUI=nil
 local result,err=PB:SelectFestergutHistory(entry.id)
 assert(result and not err and result.rosterCount==20 and bpcCalls==1 and bqlCalls==1,"click selection rebuilds both encounter plans")
 assert(PB.db.selectedFestergutHistoryId==entry.id and PB.planningSourceOverride==nil and PB.festergutSourceOverride==nil,"history selection persists while temporary planning overrides are restored")
+PB:OnEvent("PLAYER_LOGIN")
+assert(bpcCalls==2 and bqlCalls==2,"login automatically rebuilds a persisted Festergut selection instead of exporting a stale cached plan")
 PB:ClearFestergutHistorySelection(false)
 assert(PB.db.selectedFestergutHistoryId==nil and scans>=2,"current-raid mode clears the saved selection and restores the live roster")
 PB.ScanRoster,PB.BuildBPCPlan,PB.GeneratePlan,PB.UpdateUI=oldScan,oldBPC,oldBQL,oldUpdate

@@ -5,7 +5,7 @@ These tools bridge a flushed WoW SavedVariables export to a raid team's own Goog
 ## Files
 
 - `DiscordPost.gs` — bind this to the adapting team's workbook. First-time setup stores that workbook's ID and secrets in document properties; no live identifier is committed.
-- `Sync-PizzaRaidPlannerToSheets.ps1` — reads only quoted Base64 export fields, validates the fixed layout, renders native 4096px PNGs, and calls the authenticated Apps Script endpoint.
+- `Sync-PizzaRaidPlannerToSheets.ps1` — reads only quoted Base64 export fields, validates the fixed layout, renders native 4096px PNGs, converts only detected outer white margins to transparency without resizing, and calls the authenticated Apps Script endpoint.
 - `Publish-PizzaRaidPlannerHidden.vbs` — launches the configured publisher without leaving a terminal window open.
 - `Export-PizzaRaidPlanner.ps1` — optional manual exporter for reviewing TSV files locally.
 - `PizzaWarriorsSheetSync.ico` — upstream desktop icon; forks must replace reserved Pizza Warriors branding.

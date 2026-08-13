@@ -77,7 +77,10 @@ function PB:PlanRows(formatter)
   rows[#rows+1]=namedRow({SchemaVersion=PB.SCHEMA_VERSION,GeneratedAt=plan.generatedAt,Encounter=plan.encounter,RecordType="METADATA",Status=plan.mode,Notes="Source: "..clean(source.id).." | Target: "..clean(source.targetName).." | Duration: "..clean(source.duration)},formatter)
   for _,a in ipairs(sortedPositions(composition.positions)) do
     local p=a.player
-    rows[#rows+1]=namedRow({SchemaVersion=PB.SCHEMA_VERSION,GeneratedAt=plan.generatedAt,Encounter=plan.encounter,RecordType="POSITION",Order=a.slotNumber,Slot=a.slot,Group=a.type,Lane=a.lane,Depth=a.depth,Player=p.name,GUID=p.guid,Class=p.classToken,Role=self:ResolveRole(p),Subgroup=p.subgroup,DPSRank=a.biteRank,Movement=a.startLane and ("Start "..a.startLane.."; settle "..a.lane) or "",Status="planned",Notes=a.note},formatter)
+    local positionMovement=""
+    if a.seedLane then positionMovement="Home "..(a.lane or "unknown").."; temporarily seed "..a.seedLane.."; return "..(a.returnLane or a.lane or "home")
+    elseif a.startLane then positionMovement="Start "..a.startLane.."; settle "..a.lane end
+    rows[#rows+1]=namedRow({SchemaVersion=PB.SCHEMA_VERSION,GeneratedAt=plan.generatedAt,Encounter=plan.encounter,RecordType="POSITION",Order=a.slotNumber,Slot=a.slot,Group=a.type,Lane=a.lane,Depth=a.depth,Player=p.name,GUID=p.guid,Class=p.classToken,Role=self:ResolveRole(p),Subgroup=p.subgroup,DPSRank=a.biteRank,Movement=positionMovement,Status="planned",Notes=a.note},formatter)
   end
   for i,item in ipairs(composition.utility.shadowAM or {}) do
     local p=item.player
@@ -238,8 +241,10 @@ local function putBiteColumn(matrix,startColumn,startRow,wave)
   for i,assignment in ipairs(wave or {}) do
     -- The 3.3.5 client replaces the Unicode arrow with "?" when the EditBox
     -- selection is copied to Windows. Keep this ASCII so the worksheet receives
-    -- an unambiguous bite handoff.
-    setCell(matrix,startRow+i-1,startColumn,assignment.biter.." -> "..assignment.target)
+    -- an unambiguous bite handoff. Position slots already encode the travel
+    -- pattern, so the publish block deliberately omits internal route labels.
+    local label=assignment.biter.." -> "..assignment.target
+    setCell(matrix,startRow+i-1,startColumn,label)
   end
 end
 
@@ -283,21 +288,23 @@ function PB:BQLWorksheetRows(formatter)
   end
   setCell(matrix,10,10,"COPY A"..dumpRow(10)..":H"..dumpRow(19).." -> 'Blood Queen Lana'Thel'!N6:U15 | Ctrl+Shift+V")
 
-  -- Relative A22:G25 (dump A76:G79) matches N20:T23. The empty fourth Airphase row is intentional so
-  -- a full values-only paste removes any stale emergency assignment.
-  local shadowAM=utilityPlayerNames(composition.utility and composition.utility.shadowAM)
-  local airphaseDSac=utilityPlayerNames(composition.utility and composition.utility.dsac)
-  local shadowOrdinals={"1st","2nd","3rd","4th"}
-  local dsacLabels={"1st","2nd","Emergency",""}
+  -- Relative A22:G25 (dump A76:G79) matches N20:T23. The fixed four-row
+  -- shape carries the encounter cadence: four Shadow AM links before air one,
+  -- three Shadow AM links before air two, then two Shadow AM links after air
+  -- two. DSac is reserved for the two Bloodbolt Whirls. Column U on the live
+  -- sheet is a static cooldown legend, so the seven-column sync stays valid.
+  local cooldowns=composition.utility and composition.utility.cooldowns
+  if not cooldowns then cooldowns=self:BuildBQLCooldownPlan(composition.utility and composition.utility.shadowAM,composition.utility and composition.utility.dsac) end
   for i=1,4 do
     local rowNumber=21+i
-    setCell(matrix,rowNumber,1,shadowOrdinals[i])
-    setCell(matrix,rowNumber,2,shadowAM[i] or "—")
+    local item=cooldowns.rows and cooldowns.rows[i] or {}
+    setCell(matrix,rowNumber,1,item.leftEvent or "")
+    setCell(matrix,rowNumber,2,item.leftPlayers or "—")
     setCell(matrix,rowNumber,3,"")
-    setCell(matrix,rowNumber,4,"Shadow AM")
-    setCell(matrix,rowNumber,5,dsacLabels[i])
+    setCell(matrix,rowNumber,4,item.leftCooldown or "")
+    setCell(matrix,rowNumber,5,item.rightEvent or "")
     setCell(matrix,rowNumber,6,"")
-    setCell(matrix,rowNumber,7,dsacLabels[i]~="" and (airphaseDSac[i] or "—") or "")
+    setCell(matrix,rowNumber,7,item.rightPlayers or "—")
   end
   setCell(matrix,22,9,"COPY A"..dumpRow(22)..":G"..dumpRow(25).." -> 'Blood Queen Lana'Thel'!N20:T23 | Ctrl+Shift+V")
 
@@ -371,7 +378,7 @@ end
 function PB:DiscordText()
   local plan=self.db.latestPlan or self:GeneratePlan(); local composition=plan.composition or {}
   local lines={"Blood Queen Plan",compactPositions(composition,"ranged","Ranged DPS"),compactPositions(composition,"healers","Healers"),compactPositions(composition,"melee","Melee")}
-  if composition.secondary then lines[#lines+1]="Opening handoff: R1 bites R4 near the center-left. "..(composition.secondaryHandoff or "R4 then moves to the right lane.") end
+  if composition.secondary then lines[#lines+1]="Opening handoff: R6 comes to stationary R1 for the focus bite, then returns home to the right. "..(composition.secondaryHandoff or "R6 remains the right ranged anchor.") end
   local waves=plan.waves or {}
   if waves[0] and waves[0][1] then lines[#lines+1]="Initial: BQL -> "..waves[0][1].target end
   local n=1

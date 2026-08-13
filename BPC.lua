@@ -54,11 +54,22 @@ local function addMeleeSlots(result,members)
 
   local preferred={}
 
+  -- Retribution has no dependable boss-return tool beyond engineering boots,
+  -- and losing Vengeance while displaced is unusually punishing. Reserve M1
+  -- and M2 for the best available Ret Paladins before applying the general
+  -- pump/mobility heuristic to the next center-out pair, M3 and M4.
+  local remainingDPS={}
+  for _,p in ipairs(dpsPlayers) do
+    if p.classToken=="PALADIN" and tonumber(p.spec)==70 and #preferred<2 then
+      preferred[#preferred+1]={player=p,reason="Retribution Vengeance protection"}
+    else
+      remainingDPS[#remainingDPS+1]=p
+    end
+  end
+
   -- Alternate the best remaining performer with the best remaining player who
   -- lacks Sprint/Charge/Feral Charge. This protects pump and recovery risk
   -- without automatically pushing an exceptional mobile player outside.
-  local remainingDPS={}
-  for i,p in ipairs(dpsPlayers) do remainingDPS[i]=p end
   local choosePump=true
   while #preferred<#PB.BPC_MELEE_PREFERRED_SLOTS and #remainingDPS>0 do
     local index=1
@@ -77,7 +88,7 @@ local function addMeleeSlots(result,members)
     local p=item.player
     local mobility=mobilityFor(p)
     local detail=mobility and ("; "..mobility.." available") or "; no quick gap closer detected"
-    addSlot(result,p,"M",PB.BPC_MELEE_PREFERRED_SLOTS[i],"melee DPS","Preferred M1/M2/M6/M7: "..item.reason.."; "..dpsLabel(p)..detail..".")
+    addSlot(result,p,"M",PB.BPC_MELEE_PREFERRED_SLOTS[i],"melee DPS","Protected M1-M4 center-out pair: "..item.reason.."; "..dpsLabel(p)..detail..".")
   end
 
   local recovery={}
@@ -95,10 +106,10 @@ local function addMeleeSlots(result,members)
       local mobility=mobilityFor(p)
       local detail=mobility and ("; "..mobility.." available.") or "; no quick gap closer detected."
       local reason
-      if slotNumber==3 or slotNumber==10 then
-        reason="Overflow M3/M10: used only after the normal eight-player melee footprint; "..dpsLabel(p)..detail
+      if slotNumber==9 or slotNumber==10 then
+        reason="Overflow M9/M10 far-edge pair: used only after the normal eight-player melee footprint; "..dpsLabel(p)..detail
       else
-        reason="Recovery M4/M5/M8/M9: lower protected-slot priority; "..dpsLabel(p)..detail
+        reason="Recovery M5-M8 center-out pairs: lower protected-slot priority; "..dpsLabel(p)..detail
       end
       addSlot(result,p,"M",slotNumber,"melee DPS",reason)
     end

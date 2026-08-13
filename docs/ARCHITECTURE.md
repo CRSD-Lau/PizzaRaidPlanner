@@ -42,7 +42,7 @@ flowchart TB
 
 ### Desktop boundary
 
-`Sync-PizzaRaidPlannerToSheets.ps1` reads only quoted Base64 fields. It never evaluates Lua. It verifies freshness and export markers, sends an authenticated bounded request, receives cropped vector PDFs, renders them with Windows' built-in PDF engine, and returns exact PNG bytes.
+`Sync-PizzaRaidPlannerToSheets.ps1` reads only quoted Base64 fields. It never evaluates Lua. It verifies freshness and export markers, sends an authenticated bounded request, receives cropped vector PDFs, renders them with Windows' built-in PDF engine, converts only detected outer white margins to transparency without resizing, and returns exact PNG bytes.
 
 ### Workbook boundary
 

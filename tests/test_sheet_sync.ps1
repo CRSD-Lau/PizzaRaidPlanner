@@ -14,7 +14,7 @@ $bql.Add("Initial`t`t`t`tFirst -> Second`t`t`t`t`t`t`t`t`t`t`t`t`t`tCOPY A55:Q62
 while ($bql.Count -lt 10) { $bql.Add('') }
 $bql[9] = "H1`tHealer`t`tR1`tRanged`t`tL1`tMelee`t`tCOPY A64:H73"
 while ($bql.Count -lt 22) { $bql.Add('') }
-$bql[21] = "1st`tPaladin`t`tShadow AM`t1st`t`tPaladin`t`tCOPY A76:G79"
+$bql[21] = "1st`tAzyia`t`tAM`t1st / 2nd`t`tAzyia / Pasyon`t`tCOPY A76:G79"
 
 $combined = Merge-PizzaRaidPlannerTsv -BpcTsv ([string]::Join("`r`n", $bpc)) -BqlTsv ([string]::Join("`r`n", $bql))
 $lines = @(Get-TsvLines -Value $combined)
@@ -52,6 +52,48 @@ $lowResolutionBlocked = $false
 try { Assert-RaidPngMetadata -Metadata ([pscustomobject]@{ Width = 1024; Height = 448; Bytes = 500000 }) -ExpectedWidth 4096 -ExpectedHeight 1795 | Out-Null }
 catch { $lowResolutionBlocked = $_.Exception.Message.Contains('native 4096px') }
 if (-not $lowResolutionBlocked) { throw 'The desktop publisher must reject the old 1024px thumbnails.' }
+
+Add-Type -AssemblyName System.Drawing
+$marginTestPath = Join-Path ([IO.Path]::GetTempPath()) ('PizzaRaidPlanner-margin-' + [guid]::NewGuid().ToString('N') + '.png')
+$marginBitmap = New-Object Drawing.Bitmap(40, 30, ([Drawing.Imaging.PixelFormat]::Format32bppArgb))
+$marginGraphics = [Drawing.Graphics]::FromImage($marginBitmap)
+try {
+  $marginGraphics.Clear([Drawing.Color]::White)
+  $marginGraphics.FillRectangle([Drawing.Brushes]::Navy, 2, 3, 34, 22)
+  $marginBitmap.Save($marginTestPath, [Drawing.Imaging.ImageFormat]::Png)
+} finally {
+  $marginGraphics.Dispose()
+  $marginBitmap.Dispose()
+}
+
+try {
+  $cleaned = Convert-RaidPngOuterWhitespaceToTransparency -Path $marginTestPath -MaximumMarginPixels 10
+  if (
+    $cleaned.Width -ne 40 -or
+    $cleaned.Height -ne 30 -or
+    $cleaned.TransparentLeft -ne 2 -or
+    $cleaned.TransparentTop -ne 3 -or
+    $cleaned.TransparentRight -ne 4 -or
+    $cleaned.TransparentBottom -ne 5
+  ) {
+    throw 'Outer-whitespace cleanup changed dimensions or detected the wrong margins.'
+  }
+
+  $verifiedBitmap = [Drawing.Bitmap]::FromFile($marginTestPath)
+  try {
+    if ($verifiedBitmap.GetPixel(0, 0).A -ne 0 -or $verifiedBitmap.GetPixel(39, 29).A -ne 0) {
+      throw 'Outer-whitespace cleanup did not make the image edges transparent.'
+    }
+    $contentPixel = $verifiedBitmap.GetPixel(2, 3)
+    if ($contentPixel.A -ne 255 -or $contentPixel.B -lt 100) {
+      throw 'Outer-whitespace cleanup altered visible raid-plan pixels.'
+    }
+  } finally {
+    $verifiedBitmap.Dispose()
+  }
+} finally {
+  if (Test-Path -LiteralPath $marginTestPath) { Remove-Item -LiteralPath $marginTestPath -Force }
+}
 
 $originalLastErrorPath = $script:LastErrorPath
 $testErrorPath = Join-Path ([IO.Path]::GetTempPath()) ('PizzaRaidPlanner-error-' + [guid]::NewGuid().ToString('N') + '.json')

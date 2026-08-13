@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: "Mitchell"
     given-names: "Neil"
-version: "1.0.0"
-date-released: "2026-08-09"
+version: "1.0.1"
+date-released: "2026-08-13"
 license: "LicenseRef-PolyForm-Noncommercial-1.0.0"
 repository-code: "https://github.com/CRSD-Lau/PizzaRaidPlanner"

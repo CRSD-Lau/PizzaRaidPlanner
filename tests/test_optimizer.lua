@@ -11,7 +11,24 @@ local function setup()
 end
 setup(); local plan=PB:GeneratePlan(); eq(#plan.flatPriority,10,"DPS count"); eq(plan.flatPriority[1].name,"Lau","mage anchor"); eq(#plan.waves[1],1,"wave 1"); eq(#plan.waves[2],2,"wave 2"); eq(#plan.waves[3],4,"wave 3"); eq(#plan.waves[4],2,"wave 4")
 local seen={}; for _,a in ipairs(plan.assignments) do assert(not seen[a.targetGUID],"duplicate target"); seen[a.targetGUID]=true end
-for _,a in ipairs(plan.assignments) do if a.wave>=2 and a.targetPosition=="ranged" then eq(a.biterLane,a.targetLane,"no cross-room ranged bite") end end
+for _,a in ipairs(plan.assignments) do
+  if a.wave>=2 and a.temporaryCrossing then
+    if a.routeMode=="r6-seed" then
+      eq(a.returnActor,"both","R6 seed returns the setup biter and preserves the target's home")
+      eq(a.travelerGUID,a.targetGUID,"the bite target still comes to R6 at the seed point")
+      eq(a.setupTravelerGUID,a.biterGUID,"R6 is the special setup traveler")
+      eq(a.biterReturnLane,a.biterLane,"R6 special seed returns to the biter's right home")
+      assert(a.biterMoves and a.targetMoves,"R6 stages for the seed and the target still comes to the biter")
+    else
+      eq(a.returnActor,"target","normal crossover returns the bite target")
+      eq(a.travelerGUID,a.targetGUID,"normal crossover sends the target to the biter")
+      eq(a.returnLane,a.targetLane,"traveling target returns to its own home lane")
+      eq(a.biteLane,a.biterLane,"normal bite happens at the stationary biter")
+      assert(a.targetMoves and not a.biterMoves and a.biterKeepsDPS,"normal biter stays planted and keeps DPSing")
+    end
+    assert(a.movement:find("return",1,true) and a.movement:find("DPS",1,true),"crossover carries explicit traveler and stationary-biter instructions")
+  end
+end
 PB.roster[9].manualRole="tank"; PB.db.roleOverrides["dps9"]="tank"; PB.roster[10].manualRole="healer"; PB.db.roleOverrides["dps10"]="healer"; plan=PB:GeneratePlan(); eq(#plan.flatPriority,8,"tank/healer excluded")
 PB.db.inclusionOverrides["dps9"]=true; plan=PB:GeneratePlan(); eq(#plan.flatPriority,9,"manual include")
 PB.db.inclusionOverrides["dps2"]=false; plan=PB:GeneratePlan(); eq(#plan.flatPriority,8,"manual exclude")

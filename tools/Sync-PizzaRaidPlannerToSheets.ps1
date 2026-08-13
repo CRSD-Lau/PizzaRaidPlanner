@@ -171,7 +171,7 @@ function Merge-PizzaRaidPlannerTsv {
   }
   foreach ($marker in @('COPY A55:Q62', 'COPY A64:H73', 'COPY A76:G79')) {
     if ($BqlTsv.IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
-      throw "The BQL TSV is from an older addon build or is incomplete ($marker missing). Type /reload after installing version 1.0.0."
+      throw "The BQL TSV is from an older addon build or is incomplete ($marker missing). Type /reload after installing version 1.0.1."
     }
   }
 
@@ -264,6 +264,170 @@ function Assert-RaidPngMetadata {
     throw "Raid PNG is $($Metadata.Bytes) bytes and exceeds Discord's 10 MiB attachment limit."
   }
   return $true
+}
+
+function Test-RaidPngWhitespaceRow {
+  param(
+    [Parameter(Mandatory)][Drawing.Bitmap]$Bitmap,
+    [Parameter(Mandatory)][int]$Y,
+    [ValidateRange(0, 255)][int]$WhiteThreshold = 250
+  )
+
+  for ($x = 0; $x -lt $Bitmap.Width; $x++) {
+    $pixel = $Bitmap.GetPixel($x, $Y)
+    if (
+      $pixel.A -ne 0 -and
+      ($pixel.R -lt $WhiteThreshold -or $pixel.G -lt $WhiteThreshold -or $pixel.B -lt $WhiteThreshold)
+    ) {
+      return $false
+    }
+  }
+  return $true
+}
+
+function Test-RaidPngWhitespaceColumn {
+  param(
+    [Parameter(Mandatory)][Drawing.Bitmap]$Bitmap,
+    [Parameter(Mandatory)][int]$X,
+    [ValidateRange(0, 255)][int]$WhiteThreshold = 250
+  )
+
+  for ($y = 0; $y -lt $Bitmap.Height; $y++) {
+    $pixel = $Bitmap.GetPixel($X, $y)
+    if (
+      $pixel.A -ne 0 -and
+      ($pixel.R -lt $WhiteThreshold -or $pixel.G -lt $WhiteThreshold -or $pixel.B -lt $WhiteThreshold)
+    ) {
+      return $false
+    }
+  }
+  return $true
+}
+
+function Get-RaidPngOuterWhitespace {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [ValidateRange(0, 255)][int]$WhiteThreshold = 250,
+    [ValidateRange(1, 1024)][int]$MaximumMarginPixels = 256
+  )
+
+  Add-Type -AssemblyName System.Drawing
+  $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+  $bitmap = [Drawing.Bitmap]::FromFile($resolved)
+
+  try {
+    $top = 0
+    while (
+      $top -lt $bitmap.Height -and
+      $top -lt $MaximumMarginPixels -and
+      (Test-RaidPngWhitespaceRow -Bitmap $bitmap -Y $top -WhiteThreshold $WhiteThreshold)
+    ) {
+      $top++
+    }
+
+    $bottom = 0
+    while (
+      $bottom -lt ($bitmap.Height - $top) -and
+      $bottom -lt $MaximumMarginPixels -and
+      (Test-RaidPngWhitespaceRow -Bitmap $bitmap -Y ($bitmap.Height - 1 - $bottom) -WhiteThreshold $WhiteThreshold)
+    ) {
+      $bottom++
+    }
+
+    $left = 0
+    while (
+      $left -lt $bitmap.Width -and
+      $left -lt $MaximumMarginPixels -and
+      (Test-RaidPngWhitespaceColumn -Bitmap $bitmap -X $left -WhiteThreshold $WhiteThreshold)
+    ) {
+      $left++
+    }
+
+    $right = 0
+    while (
+      $right -lt ($bitmap.Width - $left) -and
+      $right -lt $MaximumMarginPixels -and
+      (Test-RaidPngWhitespaceColumn -Bitmap $bitmap -X ($bitmap.Width - 1 - $right) -WhiteThreshold $WhiteThreshold)
+    ) {
+      $right++
+    }
+
+    if (
+      ($top -eq $MaximumMarginPixels -and $top -lt $bitmap.Height -and (Test-RaidPngWhitespaceRow -Bitmap $bitmap -Y $top -WhiteThreshold $WhiteThreshold)) -or
+      ($bottom -eq $MaximumMarginPixels -and $bottom -lt ($bitmap.Height - $top) -and (Test-RaidPngWhitespaceRow -Bitmap $bitmap -Y ($bitmap.Height - 1 - $bottom) -WhiteThreshold $WhiteThreshold)) -or
+      ($left -eq $MaximumMarginPixels -and $left -lt $bitmap.Width -and (Test-RaidPngWhitespaceColumn -Bitmap $bitmap -X $left -WhiteThreshold $WhiteThreshold)) -or
+      ($right -eq $MaximumMarginPixels -and $right -lt ($bitmap.Width - $left) -and (Test-RaidPngWhitespaceColumn -Bitmap $bitmap -X ($bitmap.Width - 1 - $right) -WhiteThreshold $WhiteThreshold))
+    ) {
+      throw "Raid PNG outer whitespace exceeds the guarded ${MaximumMarginPixels}px limit."
+    }
+
+    if ($left + $right -ge $bitmap.Width -or $top + $bottom -ge $bitmap.Height) {
+      throw 'Raid PNG contains no visible content inside its outer whitespace.'
+    }
+
+    return [pscustomobject]@{
+      Left = $left
+      Top = $top
+      Right = $right
+      Bottom = $bottom
+    }
+  } finally {
+    $bitmap.Dispose()
+  }
+}
+
+function Convert-RaidPngOuterWhitespaceToTransparency {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [ValidateRange(0, 255)][int]$WhiteThreshold = 250,
+    [ValidateRange(1, 1024)][int]$MaximumMarginPixels = 256
+  )
+
+  Add-Type -AssemblyName System.Drawing
+  $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+  $margins = Get-RaidPngOuterWhitespace -Path $resolved -WhiteThreshold $WhiteThreshold -MaximumMarginPixels $MaximumMarginPixels
+  $bitmap = [Drawing.Bitmap]::FromFile($resolved)
+  $stream = $null
+
+  try {
+    if ($bitmap.PixelFormat -ne [Drawing.Imaging.PixelFormat]::Format32bppArgb) {
+      throw "Raid PNG must use 32-bit ARGB pixels before margin cleanup; received $($bitmap.PixelFormat)."
+    }
+
+    $transparentWhite = [Drawing.Color]::FromArgb(0, 255, 255, 255)
+
+    for ($y = 0; $y -lt $margins.Top; $y++) {
+      for ($x = 0; $x -lt $bitmap.Width; $x++) { $bitmap.SetPixel($x, $y, $transparentWhite) }
+    }
+    for ($y = $bitmap.Height - $margins.Bottom; $y -lt $bitmap.Height; $y++) {
+      for ($x = 0; $x -lt $bitmap.Width; $x++) { $bitmap.SetPixel($x, $y, $transparentWhite) }
+    }
+    for ($x = 0; $x -lt $margins.Left; $x++) {
+      for ($y = $margins.Top; $y -lt ($bitmap.Height - $margins.Bottom); $y++) { $bitmap.SetPixel($x, $y, $transparentWhite) }
+    }
+    for ($x = $bitmap.Width - $margins.Right; $x -lt $bitmap.Width; $x++) {
+      for ($y = $margins.Top; $y -lt ($bitmap.Height - $margins.Bottom); $y++) { $bitmap.SetPixel($x, $y, $transparentWhite) }
+    }
+
+    $stream = New-Object IO.MemoryStream
+    $bitmap.Save($stream, [Drawing.Imaging.ImageFormat]::Png)
+    $bytes = $stream.ToArray()
+  } finally {
+    if ($stream) { $stream.Dispose() }
+    $bitmap.Dispose()
+  }
+
+  [IO.File]::WriteAllBytes($resolved, $bytes)
+  $metadata = Get-PngMetadata -Path $resolved
+  return [pscustomobject]@{
+    Width = $metadata.Width
+    Height = $metadata.Height
+    Bytes = $metadata.Bytes
+    TransparentLeft = $margins.Left
+    TransparentTop = $margins.Top
+    TransparentRight = $margins.Right
+    TransparentBottom = $margins.Bottom
+  }
 }
 
 function Initialize-WindowsPdfRenderer {
@@ -413,7 +577,8 @@ function Convert-PreparedRaidPdfs {
     $pdfPath = Join-Path $TempDirectory ($safeName + '.pdf')
     $pngPath = Join-Path $TempDirectory ($safeName + '.png')
     [IO.File]::WriteAllBytes($pdfPath, $pdfBytes)
-    $metadata = Convert-CroppedPdfToRaidPng -PdfPath $pdfPath -PngPath $pngPath -TargetWidth $targetWidth
+    Convert-CroppedPdfToRaidPng -PdfPath $pdfPath -PngPath $pngPath -TargetWidth $targetWidth | Out-Null
+    $metadata = Convert-RaidPngOuterWhitespaceToTransparency -Path $pngPath
     Assert-RaidPngMetadata -Metadata $metadata -ExpectedWidth $targetWidth -ExpectedHeight $expectedHeight | Out-Null
     $pngBytes = [IO.File]::ReadAllBytes($pngPath)
 
@@ -473,7 +638,7 @@ function Invoke-PizzaRaidPlannerSheetSync {
     token = $token
     tsv = $combinedTsv
     sourceWrittenAt = $sourceWrittenAt
-    addonVersion = '1.0.0'
+    addonVersion = '1.0.1'
   }
 
   if ($PublishToDiscord) {
@@ -503,7 +668,7 @@ function Invoke-PizzaRaidPlannerSheetSync {
           token = $token
           tsv = $combinedTsv
           sourceWrittenAt = $sourceWrittenAt
-          addonVersion = '1.0.0'
+          addonVersion = '1.0.1'
           images = $images
         }
         $response = Invoke-PizzaRaidPlannerEndpoint `
