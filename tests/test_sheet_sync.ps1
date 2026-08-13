@@ -53,46 +53,50 @@ try { Assert-RaidPngMetadata -Metadata ([pscustomobject]@{ Width = 1024; Height 
 catch { $lowResolutionBlocked = $_.Exception.Message.Contains('native 4096px') }
 if (-not $lowResolutionBlocked) { throw 'The desktop publisher must reject the old 1024px thumbnails.' }
 
-Add-Type -AssemblyName System.Drawing
-$marginTestPath = Join-Path ([IO.Path]::GetTempPath()) ('PizzaRaidPlanner-margin-' + [guid]::NewGuid().ToString('N') + '.png')
-$marginBitmap = New-Object Drawing.Bitmap(40, 30, ([Drawing.Imaging.PixelFormat]::Format32bppArgb))
-$marginGraphics = [Drawing.Graphics]::FromImage($marginBitmap)
-try {
-  $marginGraphics.Clear([Drawing.Color]::White)
-  $marginGraphics.FillRectangle([Drawing.Brushes]::Navy, 2, 3, 34, 22)
-  $marginBitmap.Save($marginTestPath, [Drawing.Imaging.ImageFormat]::Png)
-} finally {
-  $marginGraphics.Dispose()
-  $marginBitmap.Dispose()
-}
-
-try {
-  $cleaned = Convert-RaidPngOuterWhitespaceToTransparency -Path $marginTestPath -MaximumMarginPixels 10
-  if (
-    $cleaned.Width -ne 40 -or
-    $cleaned.Height -ne 30 -or
-    $cleaned.TransparentLeft -ne 2 -or
-    $cleaned.TransparentTop -ne 3 -or
-    $cleaned.TransparentRight -ne 4 -or
-    $cleaned.TransparentBottom -ne 5
-  ) {
-    throw 'Outer-whitespace cleanup changed dimensions or detected the wrong margins.'
+if ($env:OS -eq 'Windows_NT') {
+  Add-Type -AssemblyName System.Drawing
+  $marginTestPath = Join-Path ([IO.Path]::GetTempPath()) ('PizzaRaidPlanner-margin-' + [guid]::NewGuid().ToString('N') + '.png')
+  $marginBitmap = New-Object Drawing.Bitmap(40, 30, ([Drawing.Imaging.PixelFormat]::Format32bppArgb))
+  $marginGraphics = [Drawing.Graphics]::FromImage($marginBitmap)
+  try {
+    $marginGraphics.Clear([Drawing.Color]::White)
+    $marginGraphics.FillRectangle([Drawing.Brushes]::Navy, 2, 3, 34, 22)
+    $marginBitmap.Save($marginTestPath, [Drawing.Imaging.ImageFormat]::Png)
+  } finally {
+    $marginGraphics.Dispose()
+    $marginBitmap.Dispose()
   }
 
-  $verifiedBitmap = [Drawing.Bitmap]::FromFile($marginTestPath)
   try {
-    if ($verifiedBitmap.GetPixel(0, 0).A -ne 0 -or $verifiedBitmap.GetPixel(39, 29).A -ne 0) {
-      throw 'Outer-whitespace cleanup did not make the image edges transparent.'
+    $cleaned = Convert-RaidPngOuterWhitespaceToTransparency -Path $marginTestPath -MaximumMarginPixels 10
+    if (
+      $cleaned.Width -ne 40 -or
+      $cleaned.Height -ne 30 -or
+      $cleaned.TransparentLeft -ne 2 -or
+      $cleaned.TransparentTop -ne 3 -or
+      $cleaned.TransparentRight -ne 4 -or
+      $cleaned.TransparentBottom -ne 5
+    ) {
+      throw 'Outer-whitespace cleanup changed dimensions or detected the wrong margins.'
     }
-    $contentPixel = $verifiedBitmap.GetPixel(2, 3)
-    if ($contentPixel.A -ne 255 -or $contentPixel.B -lt 100) {
-      throw 'Outer-whitespace cleanup altered visible raid-plan pixels.'
+
+    $verifiedBitmap = [Drawing.Bitmap]::FromFile($marginTestPath)
+    try {
+      if ($verifiedBitmap.GetPixel(0, 0).A -ne 0 -or $verifiedBitmap.GetPixel(39, 29).A -ne 0) {
+        throw 'Outer-whitespace cleanup did not make the image edges transparent.'
+      }
+      $contentPixel = $verifiedBitmap.GetPixel(2, 3)
+      if ($contentPixel.A -ne 255 -or $contentPixel.B -lt 100) {
+        throw 'Outer-whitespace cleanup altered visible raid-plan pixels.'
+      }
+    } finally {
+      $verifiedBitmap.Dispose()
     }
   } finally {
-    $verifiedBitmap.Dispose()
+    if (Test-Path -LiteralPath $marginTestPath) { Remove-Item -LiteralPath $marginTestPath -Force }
   }
-} finally {
-  if (Test-Path -LiteralPath $marginTestPath) { Remove-Item -LiteralPath $marginTestPath -Force }
+} else {
+  Write-Output 'Outer-whitespace image test: SKIP (the production renderer is Windows-only).'
 }
 
 $originalLastErrorPath = $script:LastErrorPath

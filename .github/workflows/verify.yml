@@ -53,9 +53,19 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  verify-windows-publisher:
+    runs-on: windows-latest
+    steps:
+      - name: Check out the approved source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run the Windows-only publisher and transparent-margin tests
+        shell: pwsh
+        run: ./tests/test_sheet_sync.ps1
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: verify
+    needs: [verify, verify-windows-publisher]
     runs-on: ubuntu-latest
     permissions:
       contents: write
