@@ -1,11 +1,13 @@
 [CmdletBinding()]
 param(
-  [string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot)
+  [string]$RepositoryRoot = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) { $RepositoryRoot = Split-Path -Parent $scriptRoot }
 $root = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
 $excludedDirectories = @('.git', 'dist')
 $binaryExtensions = @('.gif', '.ico', '.jpg', '.jpeg', '.png', '.tga', '.webp', '.zip')

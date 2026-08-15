@@ -30,6 +30,7 @@ local TAB_HELP={
   ["copy-bql"]={"Copy BQL","Builds the Blood Queen position, cooldown, and bite-order TSV from the selected Festergut kill, anchored at WoW TSV Dump A55 below BPC."},
   scan={"Scan Raid","Returns to current-raid mode and refreshes names, classes, specs, roles, groups, and connectivity from the live raid roster."},
   live={"Live Mode","Optional Blood Queen pull monitoring. It tracks unexpected bites for review; it does not cast, assign protected actions, or alter the published sheet."},
+  audible={"Roster Audible","Rescans the live raid after Festergut and atomically rebuilds BPC positions, BQL positions and bite order, and both Paladin rotations from one roster snapshot."},
 }
 
 local function showButtonHelp(button)
@@ -175,6 +176,11 @@ function PB:CreateUI()
   local liveButton=button("live","Live: Off",636,100,function()
     if PB.live.active then PB:StopLive() else PB:ClearFestergutHistorySelectionSafe(false); PB:StartLive() end
   end)
+  button("audible","Audible",740,104,function()
+    local bundle,err=PB:RunRosterAudibleSafe()
+    if not bundle then PB:Print(err or "Roster audible could not be generated."); return end
+    PB:ShowView("audible")
+  end)
 
   local editorPanel=CreateFrame("Frame",nil,f); editorPanel:SetPoint("TOPLEFT",16,-98); editorPanel:SetPoint("BOTTOMRIGHT",-16,42)
   local scroll=CreateFrame("ScrollFrame","PizzaRaidPlannerScrollFrame",editorPanel,"UIPanelScrollFrameTemplate")
@@ -228,7 +234,7 @@ function PB:CreateUI()
   end
   self.ui=f
   for key,b in pairs(tabButtons) do local help=TAB_HELP[key]; if help then self:AttachButtonHelp(b,help[1],help[2]) end end
-  self:SetEditorText("Enter ICC and raid normally. Before Princes use /prp publish bpc and paste at WoW TSV Dump A1; before Blood Queen use /prp publish and paste at A55. Each ready-sized block prints its exact visible-tab destination; use Ctrl+Shift+V there to preserve formatting.")
+  self:SetEditorText("Enter ICC and raid normally. A confirmed Festergut kill becomes the shared BPC/BQL benchmark. If the roster changes afterward, use Roster Audible to rebuild both encounters together. Then /reload and run the desktop publisher.")
 end
 
 function PB:GetSourceHistoryButton(index)
@@ -248,11 +254,12 @@ function PB:UpdateSourceHistoryUI()
   if self.db.selectedFestergutHistoryId and not selected then self.db.selectedFestergutHistoryId=nil end
   local rows={{id="current",current=true}}
   for i=#history,1,-1 do rows[#rows+1]={id=history[i].id,entry=history[i]} end
+  local kills=0; for _,entry in ipairs(history) do if self:IsConfirmedFestergutHistoryEntry(entry) then kills=kills+1 end end
 
   if selected then
     self.ui.sourceSummary:SetText("Selected: Festergut "..date("%Y-%m-%d %H:%M",selected.recordedAt).." | "..#(selected.roster or {}).." recorded raiders | BPC and BQL use this kill")
   else
-    self.ui.sourceSummary:SetText("Current raid mode | "..#history.." saved Festergut kill"..(#history==1 and "" or "s").." available")
+    self.ui.sourceSummary:SetText("Current raid mode | "..kills.." confirmed kill"..(kills==1 and "" or "s").." | "..(#history-kills).." wipe/pull record"..((#history-kills)==1 and "" or "s"))
   end
 
   for index,row in ipairs(rows) do
@@ -270,14 +277,17 @@ function PB:UpdateSourceHistoryUI()
     else
       local entry=row.entry
       local difficulty=entry.difficultyName or "Raid"
-      button:SetText("FESTERGUT | "..date("%Y-%m-%d %H:%M",entry.recordedAt).." | "..difficulty.." | "..math.floor(entry.duration or 0).."s | "..#(entry.roster or {}).." raiders")
+      local confirmed=PB:IsConfirmedFestergutHistoryEntry(entry)
+      local result=confirmed and (entry.result=="legacy-kill" and "LEGACY KILL" or "KILL") or "WIPE / PULL"
+      button:SetText("FESTERGUT "..result.." | "..date("%Y-%m-%d %H:%M",entry.recordedAt).." | "..difficulty.." | "..math.floor(entry.duration or 0).."s | "..#(entry.roster or {}).." raiders")
       button:SetScript("OnClick",function()
+        if not PB:IsConfirmedFestergutHistoryEntry(entry) then PB:Print("That Festergut record was not a confirmed kill and cannot be selected for automatic planning."); return end
         local result,err=PB:SelectFestergutHistorySafe(entry.id)
         if not result then PB:Print("History load failed: "..tostring(err)); return end
         PB:ShowView("sources")
         PB:Print("Loaded saved Festergut from "..date("%Y-%m-%d %H:%M",entry.recordedAt).."; BPC, BQL Review, and both Copy tabs are ready.")
       end)
-      self:AttachButtonHelp(button,"Saved Festergut Kill","Loads this kill's Festergut-only DPS and recorded raid composition into BPC and BQL rehearsal outputs. It does not overwrite or replace the live raid roster.")
+      self:AttachButtonHelp(button,confirmed and "Saved Festergut Kill" or "Festergut Wipe / Pull",confirmed and "Loads this confirmed kill's Festergut-only DPS and recorded raid composition into both encounter plans." or "Retained for audit only. Wipes and unconfirmed pulls are never automatic BPC/BQL benchmarks.")
     end
     button:Show()
   end
@@ -308,7 +318,10 @@ function PB:UpdateUI()
   local prefix=self.uiView=="export" and "COPY READY - CTRL+C | " or ""
   local raidCount=historyEntry and #(historyEntry.roster or {}) or #self.roster
   local mode=historyEntry and ("HISTORY "..date("%Y-%m-%d %H:%M",historyEntry.recordedAt)) or ("ICC "..(self:IsICCTrackingActive() and "ON" or "OFF"))
-  self.ui.status:SetText(prefix..mode.." | "..raidCount.." raiders | Source: "..(source and source.targetName or "missing Festergut").." | Reviews: "..(plan and #(plan.warnings or {}) or 0))
+  local reviews=(plan and #(plan.warnings or {}) or 0)+(bpcPlan and #(bpcPlan.warnings or {}) or 0)
+  local dirtyLabel=self.db.planDirtyReason=="roster" and "ROSTER CHANGED - RUN AUDIBLE" or "PLAN STALE - REBUILD COPY"
+  local planState=self.db.planDirty and dirtyLabel or (self.db.latestPlanBundle and ("PLAN r"..tostring(self.db.latestPlanBundle.revision)) or "PLAN NOT BUILT")
+  self.ui.status:SetText(prefix..mode.." | "..raidCount.." raiders | Source: "..(source and source.targetName or "missing Festergut").." | "..planState.." | Reviews: "..reviews)
   if self.ui.liveButton then self.ui.liveButton:SetText(self.live.active and "Live: On" or "Live: Off") end
   self:UpdateTabStyles()
   if self.uiView=="export" then return end
@@ -319,7 +332,9 @@ function PB:UpdateUI()
   end
   self:SetContentMode("edit")
   local lines={}
-  if self.uiView=="plan" then
+  if self.uiView=="audible" then
+    for _,line in ipairs(self:AudibleReviewLines()) do lines[#lines+1]=line end
+  elseif self.uiView=="plan" then
     lines[#lines+1]="BQL BITE REVIEW"..(historyEntry and (" | SAVED FESTERGUT "..date("%Y-%m-%d %H:%M",historyEntry.recordedAt)) or "")
     if plan then
       for _,a in ipairs(plan.assignments or {}) do lines[#lines+1]=(a.wave==0 and "Initial" or "Bite "..a.wave)..": "..a.biter.." ["..(a.biterSlot or "").."] -> "..a.target.." ["..(a.targetSlot or "").."] | "..(a.movement or "") end

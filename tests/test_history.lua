@@ -12,6 +12,7 @@ end
 local segment={
   id="history-seg",iccEncounter="festergut",iccSessionId="history-session",targetName="Festergut",
   endTime=900,duration=120,difficultyName="25 Player",raidSize=20,valid=true,
+  result="kill",confirmedKill=true,killEvidence="test",
   players={History1={dps=9000,totalDamage=1080000,primaryDamage=1080000,healing=0}},
 }
 local entry=PB:RememberFestergutHistory(segment,roster)
@@ -25,12 +26,12 @@ local scans,bpcCalls,bqlCalls=0,0,0
 PB.ScanRoster=function() scans=scans+1 end
 PB.BuildBPCPlan=function(self)
   bpcCalls=bpcCalls+1
-  assert(self.planningSourceOverride==entry.festergutSource and self.festergutSourceOverride==entry.festergutSource,"BPC rehearsal receives only the selected Festergut source")
+  assert(self.planningSourceOverride and self.planningSourceOverride.baseSourceId==entry.festergutSource.id and self.festergutSourceOverride==self.planningSourceOverride,"BPC rehearsal receives only the selected Festergut source")
   return {warnings={},source=self:GetFestergutSource()}
 end
 PB.GeneratePlan=function(self)
   bqlCalls=bqlCalls+1
-  assert(self.planningSourceOverride==entry.festergutSource and self.festergutSourceOverride==entry.festergutSource,"BQL rehearsal receives only the selected Festergut source")
+  assert(self.planningSourceOverride and self.planningSourceOverride.baseSourceId==entry.festergutSource.id and self.festergutSourceOverride==self.planningSourceOverride,"BQL rehearsal receives only the selected Festergut source")
   return {warnings={},source=self:GetFestergutSource()}
 end
 PB.UpdateUI=nil
@@ -43,10 +44,15 @@ PB:ClearFestergutHistorySelection(false)
 assert(PB.db.selectedFestergutHistoryId==nil and scans>=2,"current-raid mode clears the saved selection and restores the live roster")
 PB.ScanRoster,PB.BuildBPCPlan,PB.GeneratePlan,PB.UpdateUI=oldScan,oldBPC,oldBQL,oldUpdate
 
+local wipe=PB:RememberFestergutHistory({id="history-wipe",iccEncounter="festergut",iccSessionId="history-session",targetName="Festergut",endTime=950,duration=90,difficultyName="25 Player",raidSize=20,valid=true,result="wipe",confirmedKill=false,players={}},roster)
+assert(wipe and not PB:IsConfirmedFestergutHistoryEntry(wipe),"valid Festergut wipe remains auditable but is not a confirmed benchmark")
+local rejected,rejectedError=PB:SelectFestergutHistory(wipe.id)
+assert(not rejected and rejectedError:find("confirmed Festergut kills",1,true),"Festergut wipe cannot be selected for automatic planning")
+
 PizzaRaidPlannerDB=nil; PizzaRaidPlannerExportDB=nil; PB:InitDB()
 PizzaRaidPlannerLocalHistorySeed["legacy-seg"]={roster=roster}
 PB.db.segments={{id="legacy-seg",iccEncounter="festergut",iccSessionId="legacy-session",targetName="Festergut",endTime=800,duration=100,difficultyName="25 Player",raidSize=20,valid=true,players={}}}
 PB:EnsureFestergutHistory()
-assert(#PB.db.festergutHistory==1 and #PB.db.festergutHistory[1].roster==20 and PB.db.festergutHistory[1].rosterSource=="local legacy recovery","pre-history Festergut can be recovered once without changing normal capture logic")
+assert(#PB.db.festergutHistory==1 and #PB.db.festergutHistory[1].roster==20 and PB.db.festergutHistory[1].rosterSource=="local legacy recovery" and PB.db.festergutHistory[1].result=="legacy-kill","pre-history Festergut is preserved as an explicitly labeled legacy kill")
 PizzaRaidPlannerLocalHistorySeed["legacy-seg"]=nil
 print("test_history: OK")

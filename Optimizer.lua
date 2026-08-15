@@ -525,7 +525,7 @@ function PB:GeneratePlan(liveRebuild)
   end
   if self.live.active and liveRebuild then plan.warnings[#plan.warnings+1]="Live plan recalculated; completed bites were retained." end
   self.db.latestPlan=plan
-  self:BuildExports()
+  if not self._buildingPlanBundle and self.db then self.db.planDirty=true; self.db.planDirtyReason="legacy-plan" end
   if self.UpdateUI then self:UpdateUI() end
   return plan
 end

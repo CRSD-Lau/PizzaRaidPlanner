@@ -3,7 +3,7 @@ function PB:StartAutomaticSegment()
   if not self:IsICCTrackingActive() then return false end
   if self.segment and self.segment.active then self.segment.leftAt=nil; return true end
   local session=self.db.iccSession
-  self.segment={ active=true,id="seg-"..self:Now(),started=self:Now(),lastHostile=self:Now(),players={},targets={},petDamage=0,manual=false,iccSessionId=session.id,instanceName=session.instanceName,difficultyName=session.difficultyName }
+  self.segment={ active=true,id="seg-"..self:Now(),started=self:Now(),lastHostile=self:Now(),players={},targets={},killedBosses={},petDamage=0,manual=false,iccSessionId=session.id,instanceName=session.instanceName,difficultyName=session.difficultyName }
   self:Debug("Damage segment started")
   return true
 end
@@ -16,6 +16,15 @@ function PB:StopSample()
   if self.segment and self.segment.active then self:FinishSegment(true) else self:Print("No active sample.") end
 end
 function PB:ResetSample() self.segment=nil; self:Print("Current sample discarded.") end
+function PB:MarkSegmentBossKill(guid,name,evidence)
+  local segment=self.segment
+  if not segment or not segment.active then return nil end
+  local key=self.GetICCBossKey and self:GetICCBossKey(guid,name)
+  if not key then return nil end
+  segment.killedBosses=segment.killedBosses or {}
+  segment.killedBosses[key]={guid=guid,name=name,evidence=evidence or "combat log",at=self:Now()}
+  return key
+end
 function PB:RecordSegmentDamage(ownerGuid,targetGuid,targetName,amount,healing)
   local s=self.segment; if not s or not s.active or not ownerGuid then return end
   local p=s.players[ownerGuid] or { totalDamage=0,primaryDamage=0,healing=0,rawDamage=0,unbuffedDamage=0 }; s.players[ownerGuid]=p
@@ -54,11 +63,13 @@ function PB:FinishSegment(forced)
     return
   end
   local averageEligible=valid and boss and PB.ICC_AVERAGE_ENCOUNTERS[boss.key] or false
-  local record={id=s.id,targetGUID=primaryGUID,targetName=boss and boss.name or (primary and primary.name or "Unknown"),startTime=s.started,endTime=ended,duration=duration,raidSize=#self.roster,totalDamage=total,bossDamage=focusDamage,primaryShare=primaryShare,isBQL=isBQL,isICCBoss=boss~=nil,iccEncounter=boss and boss.key or nil,averageEligible=averageEligible,iccSessionId=s.iccSessionId,instanceName=s.instanceName,difficultyName=s.difficultyName,players=s.players,valid=valid,confidence=valid and "Good" or "Low",manual=s.manual}
+  local kill=boss and s.killedBosses and s.killedBosses[boss.key] or nil
+  local result=kill and "kill" or (boss and "wipe" or "unknown")
+  local record={id=s.id,targetGUID=primaryGUID,targetName=boss and boss.name or (primary and primary.name or "Unknown"),startTime=s.started,endTime=ended,duration=duration,raidSize=#self.roster,totalDamage=total,bossDamage=focusDamage,primaryShare=primaryShare,isBQL=isBQL,isICCBoss=boss~=nil,iccEncounter=boss and boss.key or nil,averageEligible=averageEligible,iccSessionId=s.iccSessionId,instanceName=s.instanceName,difficultyName=s.difficultyName,players=s.players,valid=valid,confidence=valid and "Good" or "Low",manual=s.manual,result=result,confirmedKill=result=="kill",killEvidence=kill and kill.evidence or nil}
   if averageEligible then self:AddICCSampleToAverage(record) end
   if valid and record.iccEncounter=="festergut" and self.RememberFestergutHistory then self:RememberFestergutHistory(record,self.roster) end
   local list=self.db.segments; list[#list+1]=record; while #list>PB.MAX_SEGMENTS do table.remove(list,1) end
-  self.segment=nil; self:Print((boss and "ICC boss sample "..record.targetName or "Manual sample").." saved ("..(valid and "valid" or "flagged")..", "..math.floor(duration).."s).")
+  self.segment=nil; self:Print((boss and "ICC boss sample "..record.targetName or "Manual sample").." saved ("..(boss and result or (valid and "valid" or "flagged"))..", "..math.floor(duration).."s).")
   self:ApplySourceToRoster()
 end
 function PB:GetSelectedSource()

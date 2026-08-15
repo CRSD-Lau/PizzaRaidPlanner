@@ -12,5 +12,13 @@ PB:Command("capability Mage am off"); assert(PB.db.capabilityOverrides.mage.aura
 PB:Command("capability Mage am clear"); assert(PB.db.capabilityOverrides.mage.auraMastery==nil,"capability clear")
 PB:Command("competent Mage on"); assert(PB.db.competenceOverrides.mage==true,"competence on")
 PB:Command("competent Mage clear"); assert(PB.db.competenceOverrides.mage==nil,"competence clear")
+local oldRunAudible,oldShowView,oldPrint=PB.RunRosterAudibleSafe,PB.ShowView,PB.Print
+local audibleShown,audiblePrinted=false,false
+PB.RunRosterAudibleSafe=function() return {revision=3,audible={rosterDiff={outgoing={{name="Old"}},incoming={{name="New"}}}}} end
+PB.ShowView=function(_,view) audibleShown=view=="audible" end
+PB.Print=function(_,message) if message:find("Roster audible r3",1,true) then audiblePrinted=true end end
+PB:Command("audible")
+assert(audibleShown and audiblePrinted,"/prp audible opens the delta review and reports the shared revision")
+PB.RunRosterAudibleSafe,PB.ShowView,PB.Print=oldRunAudible,oldShowView,oldPrint
 PB.GeneratePlan=generate
 print("test_commands: OK")

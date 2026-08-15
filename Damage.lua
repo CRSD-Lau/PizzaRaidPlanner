@@ -31,8 +31,14 @@ function PB:HandleCombatLog(...)
     local owner=self:OwnerForGUID(e.sourceGUID); local amount=tonumber(e.amount) or 0; if owner and amount>0 and self.segment and self.segment.active then self:RecordSegmentDamage(owner,nil,nil,amount,true) end
   elseif e.event=="SPELL_SUMMON" then
     local owner=self:OwnerForGUID(e.sourceGUID); if owner and e.destGUID then self.petOwners[e.destGUID]=owner end
-  elseif e.event=="UNIT_DIED" then local p=self.byGUID[e.destGUID]; if p then p.dead=true end; if self.live and self.live.active then self:GeneratePlan(true) end
-  elseif e.event=="PARTY_KILL" then if self:IsBQL(e.destGUID,e.destName) then self:EndEncounter("kill") end end
+  elseif e.event=="UNIT_DIED" then
+    if self.MarkSegmentBossKill then self:MarkSegmentBossKill(e.destGUID,e.destName,"UNIT_DIED") end
+    local p=self.byGUID[e.destGUID]; if p then p.dead=true end
+    if self.live and self.live.active then self:GeneratePlan(true) end
+  elseif e.event=="PARTY_KILL" then
+    if self.MarkSegmentBossKill then self:MarkSegmentBossKill(e.destGUID,e.destName,"PARTY_KILL") end
+    if self:IsBQL(e.destGUID,e.destName) then self:EndEncounter("kill") end
+  end
   if e.event=="SPELL_CAST_SUCCESS" and PB.UTILITY_SPELLS[e.spellId] then self:ObserveCapability(e.sourceGUID,PB.UTILITY_SPELLS[e.spellId]) end
   if e.event=="SPELL_AURA_APPLIED" or e.event=="SPELL_AURA_REMOVED" or e.event=="SPELL_CAST_SUCCESS" then self:HandleEncounterEvent(e) end
 end

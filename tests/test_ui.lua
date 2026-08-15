@@ -16,7 +16,7 @@ assert(PB.ui.logo.width==56 and PB.ui.logo.height==56,"Pizza Warriors logo is en
 assert(PB.ui.logo.point and PB.ui.logo.point[1]=="TOPRIGHT" and PB.ui.logo.point[2]==PB.ui and PB.ui.logo.point[3]=="TOPRIGHT" and PB.ui.logo.point[4]==-30 and PB.ui.logo.point[5]==-38,"Pizza Warriors logo sits below the version beside Live")
 assert(PB.ui.elvuiStyled==true and PB.ui.elvui==engine,"ElvUI theme integration selected")
 assert(handled>=9,"ElvUI skins applied to controls")
-assert(PB.ui.tabButtons["copy-bpc"] and PB.ui.tabButtons["copy-bql"],"separate BPC and BQL copy actions")
+assert(PB.ui.tabButtons["copy-bpc"] and PB.ui.tabButtons["copy-bql"] and PB.ui.tabButtons.audible,"separate BPC, BQL, and roster-audible actions")
 PB:ShowView("sources")
 assert(PB.ui.sourceContent:IsShown() and not PB.ui.edit:IsShown() and #PB.ui.sourceButtons==2,"DPS Sources renders current mode plus clickable Festergut history rows")
 local sourcesTab=PB.ui.tabButtons.sources

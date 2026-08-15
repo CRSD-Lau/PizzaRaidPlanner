@@ -1,9 +1,10 @@
 local PB = PizzaRaidPlanner
 
-local function copyPlayer(source)
+local function copyPlayer(source,preserveAvailability)
   local copy={}
   for key,value in pairs(source or {}) do copy[key]=value end
-  copy.online=true; copy.connected=true; copy.dead=false; copy.unitToken=nil
+  if not preserveAvailability then copy.online=true; copy.connected=true; copy.dead=false end
+  copy.unitToken=nil
   return copy
 end
 
@@ -62,6 +63,12 @@ function PB:RunSavedRaidTest()
   local snapshot=self:GetSavedRaidTestRoster()
   if #snapshot==0 then return nil,"No saved raid composition is available. Generate a plan while in the raid first." end
 
+  if self.BuildPlanBundle then
+    local bundle,err=self:BuildPlanBundle({roster=snapshot,source=self:GetFestergutSource(),reason="saved-test"})
+    if not bundle then return nil,err end
+    return {rosterCount=#snapshot,bpc=bundle.bpc,bql=bundle.bql,bundle=bundle}
+  end
+
   local priorSource=self.db.settings.source
   self.savedRaidTestRoster=snapshot
   self.db.settings.source="auto"
@@ -79,9 +86,10 @@ end
 
 function PB:ScanRoster()
   self.roster, self.byGUID, self.byName, self.petOwners = {}, {}, {}, {}
-  if self.savedRaidTestRoster then
-    for _,saved in ipairs(self.savedRaidTestRoster) do
-      local rec=copyPlayer(saved); local n=self:NormalizeName(rec.name)
+  local planningRoster=self.planningRosterOverride or self.savedRaidTestRoster
+  if planningRoster then
+    for _,saved in ipairs(planningRoster) do
+      local rec=copyPlayer(saved,self.planningRosterOverride~=nil); local n=self:NormalizeName(rec.name)
       rec.normalizedName=n
       self.roster[#self.roster+1],self.byGUID[rec.guid],self.byName[n]=rec,rec,rec
     end
@@ -102,6 +110,7 @@ function PB:ScanRoster()
   end
   self:ApplySourceToRoster()
   self:RememberRaidTestRoster()
+  if self.UpdatePlanDirtyState then self:UpdatePlanDirtyState() end
 end
 function PB:FindPlayer(query)
   local key=self:NormalizeName(query); if self.byName[key] then return self.byName[key] end
@@ -114,6 +123,10 @@ function PB:ApplySourceToRoster(source, explicitSource)
     p.damage=s and s.totalDamage or 0; p.bossDamage=s and s.primaryDamage or 0; p.healing=s and s.healing or 0
     p.sampleDuration=source and source.duration or 0; p.dps=s and s.dps or 0; p.expectedDPS=s and s.dps or nil
     p.confidence=s and s.confidence or (source and source.confidence or "No valid sample"); p.dataSource=source and source.id or "None"
+    local provenance=source and source.provenanceByGUID and source.provenanceByGUID[p.guid]
+    p.benchmarkProvenance=provenance and provenance.kind or (s and "source" or "missing")
+    p.benchmarkRecordedAt=provenance and provenance.recordedAt or nil
+    p.benchmarkSourceEntryId=provenance and provenance.entryId or nil
     if self.ResolveRole then self:ResolveRole(p); p.position=self:GetPosition(p); p.specName=self:GetSpecName(p) end
   end
 end

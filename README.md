@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Release 1.0.1" src="https://img.shields.io/badge/release-1.0.1-f97316?style=flat-square">
+  <img alt="Release 1.1.0" src="https://img.shields.io/badge/release-1.1.0-f97316?style=flat-square">
   <img alt="WoW 3.3.5a" src="https://img.shields.io/badge/WoW-3.3.5a-2563eb?style=flat-square">
   <img alt="Source available" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-7c3aed?style=flat-square">
   <img alt="Contributions closed" src="https://img.shields.io/badge/contributions-closed-64748b?style=flat-square">
@@ -36,12 +36,13 @@ Pizza Warriors Raid Planner captures raid composition and damage evidence inside
 
 | Planner | Output |
 |---|---|
-| **Festergut history** | Persistent DPS and roster snapshots that can be selected for rehearsal |
+| **Festergut history** | Confirmed kills plus clearly labelled wipe/pull records; only kills are selectable benchmarks |
 | **Blood Prince Council** | Valanar-active positions, Kinetic Bomb coverage, Divine Sacrifice, and Fire Aura Mastery |
 | **Blood-Queen Lana'thel** | Position-aware bite tree, R1/R6 ranged anchors, Rogue/DPS-DK Middle rules, side Retribution groups, Pact Shadow AM, and Airphase DSac |
-| **Desktop publisher** | Values-only workbook updates plus crisp 4K BPC/BQL Discord images with transparent outer margins |
+| **Roster audible** | One current-roster rebuild after Festergut, with incoming/outgoing review and same-spec historical fallback only |
+| **Desktop publisher** | One atomic BPC+BQL revision, values-only workbook updates, and crisp 4K Discord images with transparent outer margins |
 
-The BQL tree uses the second bite to establish the opposite ranged side, the third bite to seed one melee branch per side, and the final rounds to prefer same-role, same-side, then same-class/spec pairings. Bite targets move to stationary biters and return home afterward. Persisted Festergut selections are rebuilt on login so an older cached plan cannot survive a rules update.
+The BQL tree uses the second bite to establish the opposite ranged side, the third bite to seed one melee branch per side, and the final rounds to prefer same-role, same-side, then same-class/spec pairings. Bite targets move to stationary biters and return home afterward. If the roster changes after Festergut, `/prp audible` scans the current raid and rebuilds both encounters together. An incoming player receives only that player's own same-class/same-spec Festergut history when available and is otherwise clearly marked unbenchmarked—an ICC average is never substituted.
 
 ## System map
 
@@ -87,6 +88,7 @@ The public source contains no Discord webhook, deployment URL, upload token, liv
 - The Apps Script endpoint accepts only fixed actions, sheets, and ranges.
 - TSV cells are neutralized against spreadsheet formula injection.
 - Two-stage publish tickets bind validated PDFs and PNGs to one exact plan.
+- Atomic plan metadata prevents a dirty roster, stale/missing Festergut benchmark, or mixed BPC/BQL revisions from reaching the workbook.
 - Discord receives only server-validated PNG payloads within fixed dimensions and size limits.
 - Duplicate fingerprints prevent the same flushed plan from being posted twice.
 

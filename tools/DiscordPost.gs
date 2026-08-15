@@ -244,11 +244,31 @@ function buildDesktopTsvPlan_(payload) {
     return copy;
   });
 
+  const versionParts = String(payload.addonVersion || '0.0.0').split('.').map(Number);
+  const requiresBundleMetadata = (versionParts[0] || 0) > 1 || ((versionParts[0] || 0) === 1 && (versionParts[1] || 0) >= 1);
+  const hasBundleMetadata = requiresBundleMetadata || Boolean(
+    payload.planBundleId || payload.planRevision || payload.planRosterHash || payload.planSourceId || payload.planReason
+  );
+  if (hasBundleMetadata && (
+    !payload.planBundleId ||
+    !payload.planRosterHash ||
+    !payload.planSourceId ||
+    !Number.isInteger(Number(payload.planRevision)) ||
+    Number(payload.planRevision) < 1
+  )) {
+    throw new Error('The atomic BPC/BQL plan-bundle metadata is incomplete. Update the desktop launcher and regenerate the plan in game.');
+  }
+
   return {
     rows: safeRows,
     rowCount: safeRows.length,
     columnCount: maxColumns,
-    sourceWrittenAt: payload.sourceWrittenAt || ''
+    sourceWrittenAt: payload.sourceWrittenAt || '',
+    planBundleId: String(payload.planBundleId || ''),
+    planRevision: Number(payload.planRevision || 0),
+    planRosterHash: String(payload.planRosterHash || ''),
+    planSourceId: String(payload.planSourceId || ''),
+    planReason: String(payload.planReason || '')
   };
 }
 
@@ -293,7 +313,12 @@ function buildDesktopResponse_(plan, action) {
     range: 'A1:' + columnName_(plan.columnCount) + plan.rowCount,
     rows: plan.rowCount,
     columns: plan.columnCount,
-    sourceWrittenAt: plan.sourceWrittenAt
+    sourceWrittenAt: plan.sourceWrittenAt,
+    planBundleId: plan.planBundleId,
+    planRevision: plan.planRevision,
+    planRosterHash: plan.planRosterHash,
+    planSourceId: plan.planSourceId,
+    planReason: plan.planReason
   };
 }
 
@@ -369,7 +394,13 @@ function buildPublishFingerprint_(payload) {
     'publish-protocol:' +
     RAID_PUBLISH_PROTOCOL_VERSION +
     '\n' +
-    String(payload.sourceWrittenAt || '') +
+    String(payload.planBundleId || '') +
+    '\n' +
+    String(payload.planRevision || '') +
+    '\n' +
+    String(payload.planRosterHash || '') +
+    '\n' +
+    String(payload.planSourceId || '') +
     '\n' +
     String(payload.tsv || '');
   const digest = Utilities.computeDigest(
@@ -406,6 +437,11 @@ function buildConservativePostedState_(state) {
     state: 'posted',
     publishedAt: String(state.publishedAt || state.startedAt || new Date().toISOString()),
     sourceWrittenAt: String(state.sourceWrittenAt || ''),
+    planBundleId: String(state.planBundleId || ''),
+    planRevision: Number(state.planRevision || 0),
+    planRosterHash: String(state.planRosterHash || ''),
+    planSourceId: String(state.planSourceId || ''),
+    planReason: String(state.planReason || ''),
     liveSheets: state.liveSheets || [],
     files: state.files || RAID_EXPORTS.map(function(config) {
       return config.safeName + '.png';
@@ -508,6 +544,11 @@ function prepareRaidPlanPublish_(payload) {
       state: 'prepared',
       preparedAt: preparedAt,
       sourceWrittenAt: plan.sourceWrittenAt,
+      planBundleId: plan.planBundleId,
+      planRevision: plan.planRevision,
+      planRosterHash: plan.planRosterHash,
+      planSourceId: plan.planSourceId,
+      planReason: plan.planReason,
       liveSheets: liveSheets
     }));
 
@@ -579,14 +620,24 @@ function completeRaidPlanPublish_(payload) {
       state: 'posting',
       startedAt: startedAt,
       sourceWrittenAt: plan.sourceWrittenAt,
+      planBundleId: plan.planBundleId,
+      planRevision: plan.planRevision,
+      planRosterHash: plan.planRosterHash,
+      planSourceId: plan.planSourceId,
+      planReason: plan.planReason,
       liveSheets: state.liveSheets || []
     }));
 
     let result;
     try {
+      const content = plan.planRevision > 0
+        ? (plan.planReason === 'audible'
+          ? 'UPDATED raid positions — roster audible revision ' + plan.planRevision + ' — replaces the prior plan'
+          : 'Raid positions: BPC & BQL — plan revision ' + plan.planRevision)
+        : 'Raid positions: BPC & BQL';
       result = sendDiscordWebhookFiles_(
         webhook,
-        'Raid positions: BPC & BQL',
+        content,
         pngs
       );
     } catch (error) {
@@ -610,6 +661,11 @@ function completeRaidPlanPublish_(payload) {
       state: 'posted',
       publishedAt: publishedAt,
       sourceWrittenAt: plan.sourceWrittenAt,
+      planBundleId: plan.planBundleId,
+      planRevision: plan.planRevision,
+      planRosterHash: plan.planRosterHash,
+      planSourceId: plan.planSourceId,
+      planReason: plan.planReason,
       liveSheets: state.liveSheets || [],
       files: files,
       imageDetails: imageDetails,

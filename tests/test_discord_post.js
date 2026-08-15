@@ -50,6 +50,43 @@ const rows = Array.from({ length: 109 }, (_, rowIndex) =>
   )
 );
 
+const validPlanRows = Array.from({ length: 79 }, () => ['']);
+validPlanRows[0] = ['H1'];
+validPlanRows[54] = ['BQL', 'COPY A55:Q62'];
+validPlanRows[63] = ['H1'];
+validPlanRows[75] = ['1st'];
+validPlanRows[78] = ['4th'];
+const validPlanTsv = validPlanRows.map(row => row.join('\t')).join('\n');
+
+const atomicPlan = context.buildDesktopTsvPlan_({
+  tsv: validPlanTsv,
+  addonVersion: '1.1.0',
+  planBundleId: 'bundle-2',
+  planRevision: 2,
+  planRosterHash: 'roster-abc',
+  planSourceId: 'festergut-2',
+  planReason: 'audible'
+});
+assert.equal(atomicPlan.planBundleId, 'bundle-2');
+assert.equal(atomicPlan.planRevision, 2);
+assert.equal(atomicPlan.planRosterHash, 'roster-abc');
+assert.equal(atomicPlan.planSourceId, 'festergut-2');
+assert.equal(atomicPlan.planReason, 'audible');
+assert.throws(
+  () => context.buildDesktopTsvPlan_({
+    tsv: validPlanTsv,
+    addonVersion: '1.1.0',
+    planBundleId: 'bundle-incomplete',
+    planRevision: 0
+  }),
+  /plan-bundle metadata is incomplete/
+);
+assert.equal(
+  context.buildDesktopTsvPlan_({ tsv: validPlanTsv, addonVersion: '1.0.1' }).planRevision,
+  0,
+  'The protocol-2 endpoint remains compatible with a pre-1.1 desktop during deployment rollover.'
+);
+
 const updates = context.buildLiveRaidPlanUpdates_(rows);
 
 assert.equal(updates.length, 5);
@@ -147,6 +184,11 @@ const recoveredPosting = context.buildConservativePostedState_({
   state: 'posting',
   startedAt: '2026-08-09T04:52:00.000Z',
   sourceWrittenAt: '2026-08-09T04:50:00.000Z',
+  planBundleId: 'bundle-7',
+  planRevision: 7,
+  planRosterHash: 'roster-xyz',
+  planSourceId: 'festergut-7',
+  planReason: 'audible',
   liveSheets: ['Blood Prince Council!A6:F15']
 });
 assert.equal(recoveredPosting.state, 'posted');
@@ -154,6 +196,10 @@ assert.equal(recoveredPosting.fingerprint, 'known-plan');
 assert.equal(recoveredPosting.publishedAt, '2026-08-09T04:52:00.000Z');
 assert.equal(recoveredPosting.discordConfirmation, 'conservative-no-retry');
 assert.equal(recoveredPosting.files.length, 2);
+assert.equal(recoveredPosting.planBundleId, 'bundle-7');
+assert.equal(recoveredPosting.planRevision, 7);
+assert.equal(recoveredPosting.planSourceId, 'festergut-7');
+assert.equal(recoveredPosting.planReason, 'audible');
 
 assert.throws(
   () => context.validateRaidPngUploads_([

@@ -10,12 +10,19 @@ local function setCapability(p,capability,value)
   PB.db.capabilityOverrides[key]=PB.db.capabilityOverrides[key] or {}
   PB.db.capabilityOverrides[key][capability]=value
 end
+local function rebuildPlans(reason)
+  if PB.live and PB.live.active then return PB:GeneratePlan(true) end
+  local bundle,err=PB:PreparePlanBundleSafe(reason or "override")
+  if not bundle and err then PB:Print(err) end
+  return bundle
+end
 function PB:ListSources()
   local history=self:EnsureFestergutHistorySafe()
-  if #history==0 then self:Print("No saved Festergut kills yet."); return end
+  if #history==0 then self:Print("No saved Festergut pulls yet."); return end
   for i=#history,1,-1 do
     local entry=history[i]
-    self:Print(entry.id.." | Festergut "..date("%Y-%m-%d %H:%M",entry.recordedAt).." | "..math.floor(entry.duration or 0).."s | "..#(entry.roster or {}).." raiders")
+    local result=self:IsConfirmedFestergutHistoryEntry(entry) and (entry.result=="legacy-kill" and "LEGACY KILL" or "KILL") or "WIPE/PULL"
+    self:Print(entry.id.." | Festergut "..result.." | "..date("%Y-%m-%d %H:%M",entry.recordedAt).." | "..math.floor(entry.duration or 0).."s | "..#(entry.roster or {}).." raiders")
   end
 end
 local function sendChatLine(text,channel)
@@ -41,7 +48,8 @@ function PB:Command(input)
   elseif cmd=="status" then
     local source=self:GetSelectedSource(); local benchmark=self:GetBQLBenchmarkSource()
     local history=self:GetSelectedFestergutHistoryEntrySafe()
-    self:Print("ICC tracking "..(self:IsICCTrackingActive() and "ACTIVE" or "paused")..", roster "..#self.roster..", mode "..(history and ("saved Festergut "..date("%Y-%m-%d %H:%M",history.recordedAt)) or (self.live.active and "live" or "current raid"))..", BPC/BQL benchmark "..(history and "selected history" or (benchmark and benchmark.targetName or "missing Festergut"))..".")
+    local bundle=self.db.latestPlanBundle; local dirty=self.db.planDirty and (self.db.planDirtyReason=="roster" and "DIRTY - run /prp audible" or "STALE - rebuild from Copy BPC/BQL") or "ready"
+    self:Print("ICC tracking "..(self:IsICCTrackingActive() and "ACTIVE" or "paused")..", roster "..#self.roster..", mode "..(history and ("saved Festergut "..date("%Y-%m-%d %H:%M",history.recordedAt)) or (self.live.active and "live" or "current raid"))..", BPC/BQL benchmark "..(history and "selected history" or (benchmark and benchmark.targetName or "missing Festergut"))..", plan "..(bundle and ("r"..tostring(bundle.revision).." "..dirty) or "not built")..".")
   elseif cmd=="sample" then if a[2]=="start" then self:StartManualSample() elseif a[2]=="stop" then self:StopSample() elseif a[2]=="reset" then self:ResetSample() else self:Print("Usage: /prp sample start|stop|reset") end
   elseif cmd=="source" then
     if a[2]=="list" then self:ListSources()
@@ -63,38 +71,47 @@ function PB:Command(input)
     local plan,err=self:PrepareBQLPlanSafe(); if not plan then self:Print(err); return end; self:ShowExport("tsv","plan")
     if plan and plan.first then self:Print("BQL blocks selected. Paste at 'WoW TSV Dump' A55; then Ctrl+Shift+V A55:Q62 to 'Blood Queen Lana'Thel' A28, A64:H73 to N6, and A76:G79 to N20.") else self:Print("No plan generated: collect a longer boss segment first or review role overrides.") end
   elseif cmd=="live" then if a[2]=="on" then self:StartLive() elseif a[2]=="off" then self:StopLive() else self:Print("Live mode is optional BQL pull monitoring that reroots the review plan after an unexpected vampire; it never casts or changes the pre-published sheet. Usage: /prp live on|off") end
-  elseif cmd=="first" then local p=playerOrError(a[2]); if p then self.db.plannedFirst=p.normalizedName; self:GeneratePlan(); self:Print("Planned first bite: "..p.name) end
+  elseif cmd=="audible" then
+    local bundle,err=self:RunRosterAudibleSafe()
+    if not bundle then self:Print(err); return end
+    self:ShowView("audible")
+    local diff=bundle.audible and bundle.audible.rosterDiff or {}
+    self:Print("Roster audible r"..bundle.revision.." rebuilt BPC and BQL together: "..#(diff.outgoing or {}).." out / "..#(diff.incoming or {}).." in. Use /reload, then run the desktop publisher.")
+  elseif cmd=="first" then
+    if (a[2] or ""):lower()=="clear" then self.db.plannedFirst=nil; rebuildPlans("override"); self:Print("Planned first bite override cleared.")
+    else local p=playerOrError(a[2]); if p then self.db.plannedFirst=p.normalizedName; rebuildPlans("override"); self:Print("Planned first bite: "..p.name) end end
   elseif cmd=="role" then
     local p=playerOrError(a[2]); local v=a[3] and a[3]:lower()
     if p and (v=="dps" or v=="healer" or v=="tank" or v=="clear") then
       if v=="clear" then self:SetOverride("roleOverrides",p.name,nil) else self:SetOverride("roleOverrides",p.name,v) end
-      self:GeneratePlan()
+      rebuildPlans("override")
     else self:Print("Usage: /prp role <player> dps|healer|tank|clear") end
   elseif cmd=="position" then
     local p=playerOrError(a[2]); local v=a[3] and a[3]:lower()
     if p and (v=="melee" or v=="ranged" or v=="unknown" or v=="clear") then
       if v=="clear" then self:SetOverride("positionOverrides",p.name,nil) else self:SetOverride("positionOverrides",p.name,v) end
-      self:GeneratePlan()
+      rebuildPlans("override")
     else self:Print("Usage: /prp position <player> melee|ranged|unknown|clear") end
-  elseif cmd=="include" then local p=playerOrError(a[2]); if p then self:SetOverride("inclusionOverrides",p.name,true); self:GeneratePlan() end
-  elseif cmd=="exclude" then local p=playerOrError(a[2]); if p then self:SetOverride("inclusionOverrides",p.name,false); self.db.exclusionReasons=self.db.exclusionReasons or {}; self:SetOverride("exclusionReasons",p.name,table.concat(a," ",3)); self:GeneratePlan() end
-  elseif cmd=="priority" then local p=playerOrError(a[2]); if p then local v=a[3]; if v=="clear" then self:SetOverride("manualPriorities",p.name,nil) elseif tonumber(v) then self:SetOverride("manualPriorities",p.name,tonumber(v)) else self:Print("Usage: /prp priority <player> <integer>|clear") return end; self:GeneratePlan() end
+  elseif cmd=="include" then local p=playerOrError(a[2]); if p then self:SetOverride("inclusionOverrides",p.name,true); rebuildPlans("override") end
+  elseif cmd=="exclude" then local p=playerOrError(a[2]); if p then self:SetOverride("inclusionOverrides",p.name,false); self.db.exclusionReasons=self.db.exclusionReasons or {}; self:SetOverride("exclusionReasons",p.name,table.concat(a," ",3)); rebuildPlans("override") end
+  elseif cmd=="auto" then local p=playerOrError(a[2]); if p then self:SetOverride("inclusionOverrides",p.name,nil); self:SetOverride("exclusionReasons",p.name,nil); rebuildPlans("override"); self:Print(p.name.." returned to automatic inclusion.") end
+  elseif cmd=="priority" then local p=playerOrError(a[2]); if p then local v=a[3]; if v=="clear" then self:SetOverride("manualPriorities",p.name,nil) elseif tonumber(v) then self:SetOverride("manualPriorities",p.name,tonumber(v)) else self:Print("Usage: /prp priority <player> <integer>|clear") return end; rebuildPlans("override") end
   elseif cmd=="capability" then
     local p=playerOrError(a[2]); local capability=a[3] and capabilityAliases[a[3]:lower()]; local value=a[4] and a[4]:lower()
     if p and capability and (value=="on" or value=="off" or value=="clear") then
       if value=="clear" then setCapability(p,capability,nil) else setCapability(p,capability,value=="on") end
-      self:GeneratePlan(); self:Print(p.name.." "..capability.." override: "..value)
+      rebuildPlans("override"); self:Print(p.name.." "..capability.." override: "..value)
     else self:Print("Usage: /prp capability <player> am|dsac|kinetic on|off|clear") end
   elseif cmd=="competent" then
     local p=playerOrError(a[2]); local value=a[3] and a[3]:lower()
     if p and p.classToken=="MAGE" and (value=="on" or value=="off" or value=="clear") then
       if value=="clear" then self.db.competenceOverrides[p.normalizedName]=nil else self.db.competenceOverrides[p.normalizedName]=value=="on" end
-      self:GeneratePlan(); self:Print(p.name.." mage competence override: "..value)
+      rebuildPlans("override"); self:Print(p.name.." mage competence override: "..value)
     else self:Print("Usage: /prp competent <mage> on|off|clear") end
   elseif cmd=="utility" then
     local p=playerOrError(a[2]); local value=a[3] and a[3]:lower()
-    if p and value=="clear" then self.db.utilityPriorities[p.normalizedName]=nil; self:GeneratePlan()
-    elseif p and tonumber(value) then self.db.utilityPriorities[p.normalizedName]=tonumber(value); self:GeneratePlan()
+    if p and value=="clear" then self.db.utilityPriorities[p.normalizedName]=nil; rebuildPlans("override")
+    elseif p and tonumber(value) then self.db.utilityPriorities[p.normalizedName]=tonumber(value); rebuildPlans("override")
     else self:Print("Usage: /prp utility <player> <integer>|clear") end
   elseif cmd=="rules" then
     self:Print("BQL: targets come to stationary biters and return home. R1-R5 are left and R6-R10 are right. The second bite sends R6 to stationary R1, then R6 returns home as the right anchor; the third bite seeds one melee vampire per side. The last two rounds prefer same role, same side, then same class/spec (Hunter-Hunter, Shadow-Shadow, Balance-Balance). Shadow AM covers Pact links; DSac covers Bloodbolt Whirl only. Rogues and all DPS DKs use Middle, strong Ferals also use Middle, Rets stay on the sides, and melee groups remain balanced where hard constraints permit. BPC Valanar active: Boomkins R9/R10/R8; top Hunter R2, second Hunter R7; lower ranged use R4-R7; melee numbers run center-out, Rets favor M1/M2, and M9/M10 are overflow only.")
@@ -109,7 +126,7 @@ function PB:Command(input)
   elseif cmd=="export" then local v=(a[2] or "plan"):lower(); if v=="plan" then self:ShowExport("tsv","plan") elseif v=="roster" then self:ShowExport("tsv","roster") elseif v=="bpc" then self:ShowExport("tsv","bpc") elseif v=="tsv" or v=="csv" or v=="json" or v=="discord" then self:ShowExport(v,"plan") else self:Print("Usage: /prp export plan|roster|bpc|tsv|csv|json|discord") end
   elseif cmd=="announce" then local v=(a[2] or "off"):lower(); if v=="off" or v=="raid" or v=="rw" then self.db.settings.announce=v; self:Print("Announcements: "..v) else self:Print("Usage: /prp announce off|raid|rw") end
   elseif cmd=="debug" then local v=(a[2] or "off"):lower(); self.db.settings.debug=(v=="on"); self:Print("Debug "..(self.db.settings.debug and "on" or "off"))
-  elseif cmd=="help" then self:Print("Flow: open DPS Sources and select any saved Festergut, then use BQL Review, Copy BPC, or Copy BQL. Current raids save each valid Festergut automatically. Paste BPC at 'WoW TSV Dump' A1 and BQL at A55; use the printed Ctrl+Shift+V destinations. Review tools: rules; role/position/include/exclude/priority; capability; competent; utility. Other: show|scan|status; sample; source; order|plan|bpc|live; first; export; announce; debug.")
+  elseif cmd=="help" then self:Print("Flow: confirmed Festergut kill -> Copy BPC/Copy BQL -> /reload -> desktop publisher. If the roster changes, run /prp audible to rebuild both encounters together. Paste BPC at 'WoW TSV Dump' A1 and BQL at A55. Review tools: rules; role/position/include/exclude/auto/priority; capability; competent; utility; first|clear. Other: show|scan|status; sample; source; order|plan|bpc|live; export; announce; debug.")
   else self:Print("Unknown command. Use /prp help.") end
 end
 SLASH_PIZZARAIDPLANNER1="/prp"; SLASH_PIZZARAIDPLANNER2="/pb"; SLASH_PIZZARAIDPLANNER3="/bql"

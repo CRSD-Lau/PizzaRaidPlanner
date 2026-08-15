@@ -16,11 +16,12 @@ PB:UpdateICCState(true)
 local firstSession=PB.db.iccSession.id
 assert(PB.insideICC and firstSession,"entering ICC starts a session")
 
-local function bossSample(name,duration,p1Damage,p2Damage)
+local function bossSample(name,duration,p1Damage,p2Damage,killed)
   assert(PB:StartAutomaticSegment(),"ICC segment starts")
   PB.segment.started=MOCK_TIME-duration
   PB:RecordSegmentDamage("P1","BOSS",name,p1Damage,false); PB:RecordTargetDamage("P1","BOSS",p1Damage)
   PB:RecordSegmentDamage("P2","BOSS",name,p2Damage,false); PB:RecordTargetDamage("P2","BOSS",p2Damage)
+  if killed~=false then PB:MarkSegmentBossKill("BOSS",name,"test") end
   PB:FinishSegment()
 end
 
@@ -59,4 +60,6 @@ MOCK_INSTANCE_NAME="Icecrown Citadel"; MOCK_INSTANCE_TYPE="raid"; MOCK_ZONE_NAME
 assert(PB.db.iccSession.id~=firstSession,"a long break starts a fresh ICC session")
 assert(PB:GetICCAverageSource()==nil,"a new ICC session does not reuse an old raid average")
 assert(PB:GetFestergutSource()==nil,"a new ICC session does not reuse an old Festergut benchmark")
+MOCK_TIME=MOCK_TIME+100; bossSample("Festergut",60,120000,90000,false)
+assert(PB:GetFestergutSource()==nil and not PB:IsConfirmedFestergutHistoryEntry(PB.db.festergutHistory[#PB.db.festergutHistory]),"a valid Festergut wipe is retained for audit but never becomes the current planning benchmark")
 print("test_icc_session: OK")

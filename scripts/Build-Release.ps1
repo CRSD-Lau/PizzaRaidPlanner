@@ -1,12 +1,15 @@
 [CmdletBinding()]
 param(
-  [string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot),
-  [string]$OutputDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist')
+  [string]$RepositoryRoot = '',
+  [string]$OutputDirectory = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) { $RepositoryRoot = Split-Path -Parent $scriptRoot }
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = Join-Path $RepositoryRoot 'dist' }
 $root = (Resolve-Path -LiteralPath $RepositoryRoot -ErrorAction Stop).Path
 $tocPath = Join-Path $root 'PizzaRaidPlanner.toc'
 $toc = [IO.File]::ReadAllText($tocPath)
@@ -26,7 +29,7 @@ $desktopStage = Join-Path $stageRoot 'desktop\PizzaRaidPlanner-Desktop'
 $runtimeFiles = @(
   'BPC.lua', 'BQL.lua', 'Commands.lua', 'Constants.lua', 'Core.lua', 'Damage.lua',
   'Database.lua', 'Encounter.lua', 'Export.lua', 'ICCSession.lua', 'Optimizer.lua',
-  'PizzaRaidPlanner.toc', 'Roles.lua', 'Roster.lua', 'Segments.lua', 'SkadaAdapter.lua', 'UI.lua'
+  'PizzaRaidPlanner.toc', 'PlanBundle.lua', 'Roles.lua', 'Roster.lua', 'Segments.lua', 'SkadaAdapter.lua', 'UI.lua'
 )
 $desktopFiles = @(
   'DiscordPost.gs', 'Export-PizzaRaidPlanner.ps1', 'Publish-PizzaRaidPlannerHidden.vbs',

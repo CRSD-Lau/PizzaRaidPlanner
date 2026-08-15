@@ -8,12 +8,17 @@
 - [ ] After the first recognized boss, `/prp status` says `ICC tracking ACTIVE`. Before Festergut, confirm BPC/BQL warn that their required Festergut benchmark is missing instead of substituting another boss.
 - [ ] Complete normal trash between bosses and confirm it never appears in **DPS Sources**.
 - [ ] Kill Festergut and open **DPS Sources**. Confirm one dated Festergut row appears with difficulty, duration, and recorded raid count.
+- [ ] Wipe once on Festergut and confirm the row is visibly labelled `WIPE/PULL` and cannot be selected. Then kill Festergut and confirm the new `KILL` row is selectable and becomes the benchmark.
 - [ ] In **Copy BPC**, confirm Kinetic 1/2 are Hunters and Kinetic 3 is the strongest available Warlock with no unassigned-Kinetic warning.
 - [ ] Confirm **Copy BQL** prints the shared staging ranges `A55:Q62`, `A64:H73`, and `A76:G79`.
 - [ ] Confirm the Pizza Warriors emblem appears at the left side of the header without covering the title or version.
 - [ ] Select that row and confirm historical mode is clearly shown. Open **BQL Review**, **Copy BPC**, and **Copy BQL** and verify all three use that row's Festergut DPS and roster. Click **Current Raid** and confirm historical mode clears.
+- [ ] After selecting a confirmed kill, replace at least five raiders and run `/prp audible`. Confirm the review lists every incoming/outgoing player, labels the change a large shuffle, and increments one shared plan revision for both encounters.
+- [ ] Give three incoming players matching class/spec history and leave two without it. Confirm only the exact class/spec replacements show `history`; the others show `missing`, no ICC average appears, and BPC/BQL use the same roster fingerprint and bundle ID.
+- [ ] Change the roster again without running the audible, `/reload`, and launch the desktop publisher. Confirm it refuses to update the workbook because the plan is dirty. Run `/prp audible`, `/reload`, and confirm publishing is allowed.
+- [ ] Start a later ICC session with the same roster and confirm the previous raid's plan is still stale. After the new confirmed Festergut kill, rebuild either Copy tab, `/reload`, and confirm the publisher accepts only the new source ID.
 - [ ] `/reload` while inside ICC; confirm the same session/sample count resumes. Briefly leave and re-enter ICC and confirm it still resumes.
-- [ ] Before BPC, run `/prp publish bpc`; confirm H1-H5, M1-M10, R1-R10, three Hunters for Kinetics, and detected Paladins for DSac/Fire AM. Confirm no R11 label or row exists.
+- [ ] Before BPC, run `/prp publish bpc`; confirm H1-H5, M1-M10, R1-R10, two Hunters plus the strongest available Warlock for Kinetics, and detected Paladins for DSac/Fire AM. Confirm no R11 label or row exists.
 - [ ] Confirm the BPC export and Discord heading clearly say `Valanar Active / Empowered Shock Vortex`; these are not generic positions for every empowered Prince.
 - [ ] Confirm Balance Druids occupy R9, R10, then R8 and the review explains that Starfall is being kept away from Keleseth's Dark Nuclei/orb area.
 - [ ] Confirm the two highest Festergut-output Hunters occupy R2 and R7 and lead the Kinetic order unless a manual utility priority overrides it.

@@ -149,6 +149,36 @@ function Get-Base64ExportPayload {
   catch { throw "Invalid Base64 payload in $Name." }
 }
 
+function Get-PizzaRaidPlannerBundleMetadata {
+  param([Parameter(Mandatory)][string]$SavedVariablesText)
+  $json = Get-Base64ExportPayload -SavedVariablesText $SavedVariablesText -Name 'bundleMetaB64'
+  try { $metadata = $json | ConvertFrom-Json }
+  catch { throw 'The atomic plan-bundle metadata is invalid. Type /reload in WoW, then try again.' }
+
+  if (-not $metadata.PSObject.Properties['sourceId'] -or -not [string]$metadata.sourceId) {
+    throw 'The plan has no confirmed Festergut benchmark. Select a confirmed kill or finish Festergut, rebuild the Copy tabs, type /reload, then try again.'
+  }
+  foreach ($property in @('bundleId', 'revision', 'rosterHash', 'bpcBundleId', 'bqlBundleId')) {
+    if (-not $metadata.PSObject.Properties[$property] -or -not [string]$metadata.$property) {
+      throw "The atomic plan bundle is missing $property. Install PizzaRaidPlanner 1.1.0, type /reload, then try again."
+    }
+  }
+  $revision = 0
+  if (-not [int]::TryParse([string]$metadata.revision, [ref]$revision) -or $revision -lt 1) {
+    throw 'The atomic plan bundle has an invalid revision. Run /prp audible (or either Copy tab), type /reload, then try again.'
+  }
+  if ([string]$metadata.bundleId -ne [string]$metadata.bpcBundleId -or [string]$metadata.bundleId -ne [string]$metadata.bqlBundleId) {
+    throw 'BPC and BQL were generated from different plan revisions. Run /prp audible (or either Copy tab), type /reload, then try again.'
+  }
+  if ($metadata.PSObject.Properties['dirty'] -and [bool]$metadata.dirty) {
+    if ([string]$metadata.dirtyReason -eq 'roster') {
+      throw 'The raid roster changed after this plan was generated. Run /prp audible, type /reload, then try again.'
+    }
+    throw 'The Festergut benchmark or planner version changed after this plan was generated. Rebuild either Copy tab, type /reload, then try again.'
+  }
+  return $metadata
+}
+
 function Get-TsvLines {
   param([Parameter(Mandatory)][string]$Value)
   $normalized = $Value.Replace("`r`n", "`n").Replace("`r", "`n")
@@ -171,7 +201,7 @@ function Merge-PizzaRaidPlannerTsv {
   }
   foreach ($marker in @('COPY A55:Q62', 'COPY A64:H73', 'COPY A76:G79')) {
     if ($BqlTsv.IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
-      throw "The BQL TSV is from an older addon build or is incomplete ($marker missing). Type /reload after installing version 1.0.1."
+      throw "The BQL TSV is from an older addon build or is incomplete ($marker missing). Type /reload after installing version 1.1.0."
     }
   }
 
@@ -621,13 +651,14 @@ function Invoke-PizzaRaidPlannerSheetSync {
   }
 
   $raw = [IO.File]::ReadAllText($source.FullName, [Text.Encoding]::UTF8)
+  $bundle = Get-PizzaRaidPlannerBundleMetadata -SavedVariablesText $raw
   $bpcTsv = Get-Base64ExportPayload -SavedVariablesText $raw -Name 'bpcTSVB64'
   $bqlTsv = Get-Base64ExportPayload -SavedVariablesText $raw -Name 'planTSVB64'
   $combinedTsv = Merge-PizzaRaidPlannerTsv -BpcTsv $bpcTsv -BqlTsv $bqlTsv
   $rows = @(Get-TsvLines -Value $combinedTsv).Count
 
   if ($ValidateOnly) {
-    return [pscustomobject]@{ Ok = $true; Rows = $rows; BqlStartRow = $script:BqlStartRow; Source = $source.FullName }
+    return [pscustomobject]@{ Ok = $true; Rows = $rows; BqlStartRow = $script:BqlStartRow; Source = $source.FullName; BundleId = [string]$bundle.bundleId; Revision = [int]$bundle.revision; RosterHash = [string]$bundle.rosterHash }
   }
 
   $token = Unprotect-SyncToken -EncryptedToken ([string]$config.EncryptedToken)
@@ -638,7 +669,12 @@ function Invoke-PizzaRaidPlannerSheetSync {
     token = $token
     tsv = $combinedTsv
     sourceWrittenAt = $sourceWrittenAt
-    addonVersion = '1.0.1'
+    addonVersion = '1.1.0'
+    planBundleId = [string]$bundle.bundleId
+    planRevision = [int]$bundle.revision
+    planRosterHash = [string]$bundle.rosterHash
+    planSourceId = [string]$bundle.sourceId
+    planReason = [string]$bundle.reason
   }
 
   if ($PublishToDiscord) {
@@ -668,7 +704,12 @@ function Invoke-PizzaRaidPlannerSheetSync {
           token = $token
           tsv = $combinedTsv
           sourceWrittenAt = $sourceWrittenAt
-          addonVersion = '1.0.1'
+          addonVersion = '1.1.0'
+          planBundleId = [string]$bundle.bundleId
+          planRevision = [int]$bundle.revision
+          planRosterHash = [string]$bundle.rosterHash
+          planSourceId = [string]$bundle.sourceId
+          planReason = [string]$bundle.reason
           images = $images
         }
         $response = Invoke-PizzaRaidPlannerEndpoint `
@@ -697,6 +738,10 @@ function Invoke-PizzaRaidPlannerSheetSync {
     Range = [string]$response.range
     Rows = [int]$response.rows
     Columns = [int]$response.columns
+    PlanBundleId = [string]$bundle.bundleId
+    PlanRevision = [int]$bundle.revision
+    PlanRosterHash = [string]$bundle.rosterHash
+    PlanSourceId = [string]$bundle.sourceId
   }
   if ($PublishToDiscord) {
     $audit.LiveSheets = @($response.liveSheets)
@@ -722,7 +767,7 @@ function Invoke-PizzaRaidPlannerSheetSync {
   if ($PublishToDiscord -and $response.alreadyPublished) {
     Show-SyncMessage -Title 'Pizza Warriors Raid Publisher' -Text "This exact Festergut plan was already published.`r`n`r`nNothing was posted to Discord twice.`r`nOriginal publish: $($response.publishedAt)"
   } elseif ($PublishToDiscord) {
-    Show-SyncMessage -Title 'Pizza Warriors Raid Publisher' -Text "Raid positions published successfully.`r`n`r`nLive sheets updated:`r`n- Blood Prince Council`r`n- Blood Queen Lana'Thel`r`n`r`nDiscord: native 4096px BPC and BQL images posted to #raid-positions."
+    Show-SyncMessage -Title 'Pizza Warriors Raid Publisher' -Text "Raid positions published successfully.`r`n`r`nAtomic plan: revision $($bundle.revision)`r`nBundle: $($bundle.bundleId)`r`n`r`nLive sheets updated:`r`n- Blood Prince Council`r`n- Blood Queen Lana'Thel`r`n`r`nDiscord: native 4096px BPC and BQL images posted to #raid-positions."
   } else {
     Show-SyncMessage -Text "WoW TSV Dump was replaced successfully.`r`n`r`nUploaded: $($response.range)`r`nBPC starts: A1`r`nBQL starts: A55`r`n`r`nYou can now values-only copy the printed blocks into the BPC and BQL tabs, then publish to Discord."
   }

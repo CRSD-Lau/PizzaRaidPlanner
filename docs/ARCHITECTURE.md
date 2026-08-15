@@ -37,6 +37,7 @@ flowchart TB
 - `Damage.lua` records valid encounter evidence and Festergut benchmarks.
 - `Roster.lua`, `Roles.lua`, and `SkadaAdapter.lua` resolve composition evidence.
 - `BPC.lua`, `BQL.lua`, and `Optimizer.lua` construct deterministic plans.
+- `PlanBundle.lua` fingerprints the planning roster and generates BPC/BQL as one revision; it also owns post-Festergut roster-audible diffs and benchmark provenance.
 - `Export.lua` creates exact TSV rectangles and Base64 SavedVariables fields.
 - `UI.lua` exposes review and copy surfaces without protected actions.
 
@@ -50,7 +51,7 @@ flowchart TB
 
 ## Publish transaction
 
-1. Desktop validates and merges BPC/BQL TSV.
+1. Desktop validates that the roster is clean and BPC/BQL carry the same bundle ID, revision, and roster fingerprint, then merges their TSV.
 2. Apps Script authenticates the token and validates the TSV contract.
 3. Apps Script updates five fixed live ranges and returns cropped PDFs plus a random publish ticket.
 4. Windows renders native-width PNGs and verifies dimensions and attachment limits.
@@ -59,6 +60,12 @@ flowchart TB
 7. The server records the post fingerprint so the same flushed plan cannot post twice.
 
 Ambiguous post states are finalized conservatively without automatic reposting.
+
+## Benchmark and audible contract
+
+New Festergut segments must contain explicit boss-death evidence before they can become selectable benchmarks. Wipes and incomplete pulls remain in history for diagnosis. Legacy history created before this evidence field existed is retained and labelled separately.
+
+`/prp audible` compares the current raid with the last plan roster. Both encounters are regenerated from that one roster. Current/selected Festergut player samples remain authoritative; an incoming player may fall back only to that player's prior Festergut sample from the same class and spec. No ICC-wide average participates in either encounter. A new ICC session, confirmed Festergut benchmark, planner version, or roster fingerprint invalidates a current-mode bundle. Logout exports that stale pair as dirty rather than silently rebuilding it.
 
 ## Adaptation contracts
 

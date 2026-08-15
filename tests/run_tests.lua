@@ -1,9 +1,10 @@
 dofile("tests/mock_wow.lua")
-for _,file in ipairs({"Constants.lua","Database.lua","ICCSession.lua","Core.lua","Roster.lua","Roles.lua","SkadaAdapter.lua","Segments.lua","Damage.lua","BQL.lua","Optimizer.lua","BPC.lua","Encounter.lua","Export.lua","UI.lua","Commands.lua"}) do dofile(file) end
+for _,file in ipairs({"Constants.lua","Database.lua","ICCSession.lua","Core.lua","Roster.lua","Roles.lua","SkadaAdapter.lua","Segments.lua","Damage.lua","BQL.lua","Optimizer.lua","BPC.lua","PlanBundle.lua","Encounter.lua","Export.lua","UI.lua","Commands.lua"}) do dofile(file) end
 dofile("tests/test_skada.lua")
 dofile("tests/test_roles.lua")
 dofile("tests/test_roster_snapshot.lua")
 dofile("tests/test_history.lua")
+dofile("tests/test_plan_bundle.lua")
 dofile("tests/test_safe_loading.lua")
 dofile("tests/test_icc_session.lua")
 dofile("tests/test_optimizer.lua")

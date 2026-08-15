@@ -395,15 +395,32 @@ end
 
 function PB:BuildExports()
   if not self.db then return end
-  if not self.db.latestPlan then self:GeneratePlan() end
-  local plan=self.db.latestPlan or {}
-  local bpc=self.db.latestBPCPlan or self:BuildBPCPlan()
-  local json={schemaVersion=PB.SCHEMA_VERSION,metadata={generatedAt=plan.generatedAt,realm="Lordaeron",version=PB.VERSION},selectedDataSource=plan.source and plan.source.id,roster=self.roster,flatPriority=plan.flatPriority,waves=plan.waves,assignments=plan.assignments,completedAssignments=plan.completedAssignments,warnings=plan.warnings,bqlComposition=plan.composition,bpcPlan=bpc}
-  local payload={schemaVersion=PB.SCHEMA_VERSION,generatedAt=self:Now(),planTSV=self:BQLWorksheetRows(tsv),rosterTSV=self:RosterRows(tsv),bpcTSV=self:BPCWorksheetRows(tsv),planCSV=self:PlanRows(csv),rosterCSV=self:RosterRows(csv),bpcCSV=self:BPCRows(csv),json=self:JSON(json),discord=self:DiscordText(),bpcDiscord=self:BPCDiscordText()}
+  local bundle=self.db.latestPlanBundle
+  -- A roster event may mark an existing bundle dirty. Do not silently turn
+  -- /reload or logout into an unreviewed audible; preserve that last complete
+  -- pair with dirty=true so the desktop publisher blocks it. Initial/migrated
+  -- installs may still create their first atomic bundle here.
+  if self.BuildPlanBundle and not self._buildingPlanBundle and (not bundle or bundle.version~=PB.VERSION) then
+    local built,err=self:BuildPlanBundle({reason="export"})
+    if built then bundle=built elseif err then self:Debug("Atomic export retained the last complete bundle: "..tostring(err)) end
+  end
+  local plan=bundle and bundle.bql or self.db.latestPlan or {}
+  local bpc=bundle and bundle.bpc or self.db.latestBPCPlan or self:BuildBPCPlan()
+  local bundleMeta={
+    schemaVersion=PB.SCHEMA_VERSION,version=PB.VERSION,bundleId=bundle and bundle.bundleId or plan.bundleId,
+    revision=bundle and bundle.revision or plan.planRevision,generatedAt=bundle and bundle.generatedAt or plan.generatedAt,
+    sourceId=bundle and bundle.sourceId or plan.sourceId,sourceEntryId=bundle and bundle.sourceEntryId,
+    rosterHash=bundle and bundle.rosterHash or plan.rosterHash,reason=bundle and bundle.reason or "legacy",
+    mode=bundle and bundle.mode or "legacy",dirty=self.db.planDirty==true,dirtyReason=self.db.planDirtyReason,
+    bpcBundleId=bpc and bpc.bundleId,bqlBundleId=plan and plan.bundleId,
+  }
+  local json={schemaVersion=PB.SCHEMA_VERSION,metadata={generatedAt=plan.generatedAt,realm="Lordaeron",version=PB.VERSION},planBundle=bundleMeta,selectedDataSource=plan.source and plan.source.id,roster=bundle and bundle.rosterSnapshot or self.roster,flatPriority=plan.flatPriority,waves=plan.waves,assignments=plan.assignments,completedAssignments=plan.completedAssignments,warnings=plan.warnings,bqlComposition=plan.composition,bpcPlan=bpc}
+  local payload={schemaVersion=PB.SCHEMA_VERSION,generatedAt=bundleMeta.generatedAt or self:Now(),bundleMeta=self:JSON(bundleMeta),planTSV=self:BQLWorksheetRows(tsv),rosterTSV=self:RosterRows(tsv),bpcTSV=self:BPCWorksheetRows(tsv),planCSV=self:PlanRows(csv),rosterCSV=self:RosterRows(csv),bpcCSV=self:BPCRows(csv),json=self:JSON(json),discord=self:DiscordText(),bpcDiscord=self:BPCDiscordText()}
   self.exportDB.payload=payload
   self.exportDB.planTSVB64=self:Base64(payload.planTSV)
   self.exportDB.rosterTSVB64=self:Base64(payload.rosterTSV)
   self.exportDB.bpcTSVB64=self:Base64(payload.bpcTSV)
+  self.exportDB.bundleMetaB64=self:Base64(payload.bundleMeta)
   self.exportDB.jsonB64=self:Base64(payload.json)
   self.exportDB.discordB64=self:Base64(payload.discord)
   return payload

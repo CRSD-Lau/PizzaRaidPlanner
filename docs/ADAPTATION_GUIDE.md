@@ -39,8 +39,9 @@ The most consequential contracts live in:
 | `BPC.lua` | Valanar-active position layout, Kinetics, DSac, and Aura Mastery assignments |
 | `BQL.lua` | Bite eligibility, wave construction, and side-aware bite routing |
 | `Optimizer.lua` | Stable ranking and slot assignment helpers |
+| `PlanBundle.lua` | Atomic BPC/BQL revisions, roster fingerprints, audible diffs, and Festergut provenance |
 | `Roles.lua` | Spec, role, melee/ranged, and utility inference |
-| `Damage.lua` | Festergut benchmark collection and safeguards |
+| `Damage.lua` | Boss-death evidence plus Festergut benchmark collection and safeguards |
 | `Export.lua` | Fixed TSV rectangles consumed by the workbook |
 
 Write or update offline tests before changing a rule. In-game evidence is still required for combat-log identifiers and server-specific behavior.

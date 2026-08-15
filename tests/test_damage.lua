@@ -13,6 +13,8 @@ assert(PB.petOwners.GUARD=="P1","guardian ownership")
 PB.live.vampires.P1=true; PB:HandleCombatLog(5,"SPELL_DAMAGE","P1","Lau",0,"BOSS","Boss",0,125,"Buffed",1,200,0)
 assert(PB.segment.players.P1.unbuffedDamage==1200,"vampire damage excluded from baseline")
 assert(PB.segment.perTargetUnbuffed.P1.BOSS==1200,"vampire target damage excluded from baseline")
+PB:HandleCombatLog(5.5,"UNIT_DIED","BOSS","Festergut",0,"0xF130008F12000001","Festergut",0)
+assert(PB.segment.killedBosses and PB.segment.killedBosses.festergut and PB.segment.killedBosses.festergut.evidence=="UNIT_DIED","Festergut death evidence marks the active pull as a confirmed kill")
 PB.segment=nil; PB:HandleCombatLog(6,"SPELL_HEAL","P1","Lau",0,"P2","PetOwner",0,126,"Heal",1,500,0)
 assert(PB.segment==nil,"out-of-combat healing does not create a damage segment")
 PB.GetSelectedSource,PB.ApplySourceToRoster,PB.Print=oldGetSelectedSource,oldApplySourceToRoster,oldPrint

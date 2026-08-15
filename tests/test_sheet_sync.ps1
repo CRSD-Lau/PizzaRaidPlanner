@@ -37,6 +37,63 @@ if ((Get-PizzaRaidPlannerDesktopAction -PublishToDiscord) -ne 'prepareRaidPlan')
   throw 'The publish desktop action must begin the authenticated 4K transaction.'
 }
 
+function New-TestBundleSavedVariables {
+  param([hashtable]$Metadata)
+  $json = $Metadata | ConvertTo-Json -Compress
+  $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+  return 'PizzaRaidPlannerDB = { ["bundleMetaB64"] = "' + $encoded + '" }'
+}
+
+$bundleSavedVariables = New-TestBundleSavedVariables -Metadata @{
+  bundleId = 'bundle-2'
+  sourceId = 'festergut-2'
+  revision = 2
+  rosterHash = 'roster-abc'
+  bpcBundleId = 'bundle-2'
+  bqlBundleId = 'bundle-2'
+  dirty = $false
+}
+$bundleMetadata = Get-PizzaRaidPlannerBundleMetadata -SavedVariablesText $bundleSavedVariables
+if ($bundleMetadata.bundleId -ne 'bundle-2' -or [int]$bundleMetadata.revision -ne 2) {
+  throw 'Atomic plan-bundle metadata did not round-trip from SavedVariables.'
+}
+
+$dirtyBundleBlocked = $false
+try {
+  Get-PizzaRaidPlannerBundleMetadata -SavedVariablesText (New-TestBundleSavedVariables -Metadata @{
+    bundleId = 'bundle-3'; sourceId = 'festergut-3'; revision = 3; rosterHash = 'roster-def'
+    bpcBundleId = 'bundle-3'; bqlBundleId = 'bundle-3'; dirty = $true; dirtyReason = 'roster'
+  }) | Out-Null
+} catch { $dirtyBundleBlocked = $_.Exception.Message.Contains('roster changed') }
+if (-not $dirtyBundleBlocked) { throw 'A dirty roster plan must be blocked before sheet or Discord publication.' }
+
+$mixedBundleBlocked = $false
+try {
+  Get-PizzaRaidPlannerBundleMetadata -SavedVariablesText (New-TestBundleSavedVariables -Metadata @{
+    bundleId = 'bundle-4'; sourceId = 'festergut-4'; revision = 4; rosterHash = 'roster-ghi'
+    bpcBundleId = 'bundle-4'; bqlBundleId = 'bundle-old'; dirty = $false
+  }) | Out-Null
+} catch { $mixedBundleBlocked = $_.Exception.Message.Contains('different plan revisions') }
+if (-not $mixedBundleBlocked) { throw 'Mixed BPC/BQL plan revisions must be blocked before publication.' }
+
+$invalidRevisionBlocked = $false
+try {
+  Get-PizzaRaidPlannerBundleMetadata -SavedVariablesText (New-TestBundleSavedVariables -Metadata @{
+    bundleId = 'bundle-zero'; sourceId = 'festergut-zero'; revision = 0; rosterHash = 'roster-jkl'
+    bpcBundleId = 'bundle-zero'; bqlBundleId = 'bundle-zero'; dirty = $false
+  }) | Out-Null
+} catch { $invalidRevisionBlocked = $_.Exception.Message.Contains('invalid revision') }
+if (-not $invalidRevisionBlocked) { throw 'A zero plan revision must be blocked before publication.' }
+
+$missingBenchmarkBlocked = $false
+try {
+  Get-PizzaRaidPlannerBundleMetadata -SavedVariablesText (New-TestBundleSavedVariables -Metadata @{
+    bundleId = 'bundle-no-source'; revision = 5; rosterHash = 'roster-mno'
+    bpcBundleId = 'bundle-no-source'; bqlBundleId = 'bundle-no-source'; dirty = $false
+  }) | Out-Null
+} catch { $missingBenchmarkBlocked = $_.Exception.Message.Contains('no confirmed Festergut benchmark') }
+if (-not $missingBenchmarkBlocked) { throw 'A plan without a confirmed Festergut source must be blocked before publication.' }
+
 $pngBytes = New-Object byte[] 24
 [byte[]]$signature = 137, 80, 78, 71, 13, 10, 26, 10
 [Array]::Copy($signature, 0, $pngBytes, 0, $signature.Length)

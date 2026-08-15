@@ -48,6 +48,7 @@ function PB:UpdateICCState(silent)
         benchmarks = {},
       }
       self.db.iccSession = session
+      if self.db.latestPlanBundle and self.db.latestPlanBundle.mode=="current" then self.db.planDirty=true; self.db.planDirtyReason="benchmark" end
       self._skadaSourceCheckedAt, self._skadaSourceCache = nil, nil
       if not silent then self:Print("ICC detected: new DPS session started automatically.") end
     else
@@ -118,11 +119,22 @@ function PB:GetICCBossSummary(segment)
   }
 end
 
+function PB:IsConfirmedFestergutSegment(segment)
+  if not segment then return false end
+  if segment.confirmedKill~=nil then return segment.confirmedKill==true end
+  if segment.result~=nil then return segment.result=="kill" or segment.result=="legacy-kill" end
+  -- Pre-1.1 records did not retain death evidence. Preserve those existing
+  -- user-confirmed history rows as legacy kills; all newly captured pulls carry
+  -- an explicit kill/wipe result.
+  return true
+end
+
 function PB:RememberICCEncounterBenchmark(segment)
   local session=self.db and self.db.iccSession
   if not session or not session.id or not segment or not segment.valid or not segment.iccEncounter or segment.iccSessionId~=session.id then return end
+  if segment.iccEncounter=="festergut" and not self:IsConfirmedFestergutSegment(segment) then return end
   session.benchmarks=session.benchmarks or {}
-  session.benchmarks[segment.iccEncounter]={
+  local benchmark={
     id="benchmark-"..segment.iccEncounter.."-"..tostring(segment.id),
     segmentId=segment.id,
     targetName=segment.targetName,
@@ -134,7 +146,15 @@ function PB:RememberICCEncounterBenchmark(segment)
     iccEncounter=segment.iccEncounter,
     sessionId=session.id,
     recordedAt=segment.endTime,
+    result=segment.result or "legacy-kill",
+    confirmedKill=self:IsConfirmedFestergutSegment(segment),
+    killEvidence=segment.killEvidence,
   }
+  session.benchmarks[segment.iccEncounter]=benchmark
+  if segment.iccEncounter=="festergut" and self.db.latestPlanBundle and self.db.latestPlanBundle.mode=="current" and self.db.latestPlanBundle.sourceId~=benchmark.id then
+    self.db.planDirty=true
+    self.db.planDirtyReason="benchmark"
+  end
 end
 
 function PB:GetICCEncounterBenchmark(encounter)
@@ -142,10 +162,10 @@ function PB:GetICCEncounterBenchmark(encounter)
   if not session or not session.id then return nil end
   session.benchmarks=session.benchmarks or {}
   local stored=session.benchmarks[encounter]
-  if stored and stored.sessionId==session.id and stored.valid then return stored end
+  if stored and stored.sessionId==session.id and stored.valid and (encounter~="festergut" or self:IsConfirmedFestergutSegment(stored)) then return stored end
   for i=#(self.db.segments or {}),1,-1 do
     local segment=self.db.segments[i]
-    if segment.valid and segment.iccSessionId==session.id and segment.iccEncounter==encounter then
+    if segment.valid and segment.iccSessionId==session.id and segment.iccEncounter==encounter and (encounter~="festergut" or self:IsConfirmedFestergutSegment(segment)) then
       self:RememberICCEncounterBenchmark(segment)
       return session.benchmarks[encounter]
     end
@@ -259,6 +279,9 @@ local function copyFestergutHistorySource(source, fallbackId)
     sessionId=source.sessionId or source.iccSessionId,
     recordedAt=source.recordedAt or source.endTime,
     sampleCount=source.sampleCount,
+    result=source.result or (source.confirmedKill==false and "wipe" or "legacy-kill"),
+    confirmedKill=source.confirmedKill~=false,
+    killEvidence=source.killEvidence,
     players={},
   }
   for guid,player in pairs(source.players or {}) do
@@ -293,6 +316,12 @@ end
 
 function PB:GetSelectedFestergutHistoryEntry()
   return self:GetFestergutHistoryEntry(self.db and self.db.selectedFestergutHistoryId)
+end
+
+function PB:IsConfirmedFestergutHistoryEntry(entry)
+  if not entry then return false end
+  if entry.confirmedKill~=nil then return entry.confirmedKill==true end
+  return self:IsConfirmedFestergutSegment(entry.festergutSource or entry)
 end
 
 local function localFestergutSeedRoster(segmentId,sourceId)
@@ -342,12 +371,16 @@ function PB:RememberFestergutHistory(segment,roster)
   local history=self:GetFestergutHistory()
   local entry=self:GetFestergutHistoryEntry(id)
   local festergutSource=copyFestergutHistorySource(segment,"benchmark-festergut-"..tostring(segmentId))
+  local confirmedKill=self:IsConfirmedFestergutSegment(segment)
+  local result=segment.result or (confirmedKill and "legacy-kill" or "wipe")
   local snapshot=self:SnapshotRaidRoster(roster or {})
   local recoverySource
   if #snapshot==0 then snapshot,recoverySource=self:RecoverFestergutRoster(festergutSource,segmentId) end
   if entry then
     if #(entry.roster or {})<#snapshot then entry.roster=snapshot; entry.rosterSource=recoverySource or "recorded raid roster" end
     if not entry.festergutSource then entry.festergutSource=festergutSource end
+    entry.result=result; entry.confirmedKill=confirmedKill; entry.killEvidence=segment.killEvidence or entry.killEvidence
+    if entry.festergutSource then entry.festergutSource.result=result; entry.festergutSource.confirmedKill=confirmedKill; entry.festergutSource.killEvidence=segment.killEvidence or entry.festergutSource.killEvidence end
     return entry
   end
 
@@ -357,6 +390,7 @@ function PB:RememberFestergutHistory(segment,roster)
     difficultyName=segment.difficultyName or "Raid",raidSize=tonumber(segment.raidSize) or #snapshot,
     festergutSource=festergutSource,
     roster=snapshot,rosterSource=recoverySource or (#snapshot>0 and "recorded raid roster" or "missing"),
+    result=result,confirmedKill=confirmedKill,killEvidence=segment.killEvidence,
   }
   history[#history+1]=entry
   while #history>PB.MAX_FESTERGUT_HISTORY do
@@ -368,6 +402,13 @@ end
 
 function PB:EnsureFestergutHistory()
   if not self.db then return {} end
+  for _,entry in ipairs(self:GetFestergutHistory()) do
+    if entry.confirmedKill==nil then entry.confirmedKill=true; entry.result=entry.result or "legacy-kill" end
+    if entry.festergutSource then
+      entry.festergutSource.confirmedKill=entry.confirmedKill
+      entry.festergutSource.result=entry.result
+    end
+  end
   for _,segment in ipairs(self.db.segments or {}) do
     if segment.valid and segment.iccEncounter=="festergut" then self:RememberFestergutHistory(segment,{}) end
   end
@@ -381,6 +422,9 @@ function PB:GenerateFestergutHistoryPlans(entryOrId)
   if not entry then return nil,"Saved Festergut entry was not found." end
   if self.live and self.live.active then return nil,"Turn Live mode off before loading a historical rehearsal." end
   if #(entry.roster or {})==0 then return nil,"This Festergut entry has DPS but no recoverable raid roster." end
+  if not self:IsConfirmedFestergutHistoryEntry(entry) then return nil,"This Festergut pull was not a confirmed kill and cannot be used for automatic planning." end
+
+  if self.BuildPlanBundle then return self:BuildPlanBundle({historyEntry=entry,reason="history"}) end
 
   local previousRoster=self.savedRaidTestRoster
   local previousGeneral=self.planningSourceOverride
@@ -412,6 +456,7 @@ function PB:SelectFestergutHistory(id)
   self:EnsureFestergutHistory()
   local entry=self:GetFestergutHistoryEntry(id)
   if not entry then return nil,"Saved Festergut entry was not found." end
+  if not self:IsConfirmedFestergutHistoryEntry(entry) then return nil,"Only confirmed Festergut kills can be selected for BPC/BQL planning." end
   local previous=self.db.selectedFestergutHistoryId
   self.db.selectedFestergutHistoryId=id
   local result,err=self:GenerateFestergutHistoryPlans(entry)
@@ -424,8 +469,7 @@ function PB:ClearFestergutHistorySelection(rebuild)
   self.db.selectedFestergutHistoryId=nil
   self.db.settings.source="auto"
   if rebuild then
-    self:BuildBPCPlan()
-    self:GeneratePlan()
+    if self.BuildPlanBundle then self:BuildPlanBundle({reason="current"}) else self:BuildBPCPlan(); self:GeneratePlan() end
   else
     self:ScanRoster()
     if self.UpdateUI then self:UpdateUI() end
@@ -434,19 +478,19 @@ end
 
 function PB:PrepareBPCPlanForUI()
   local entry=self:GetSelectedFestergutHistoryEntry()
-  if entry then
-    local result,err=self:GenerateFestergutHistoryPlans(entry)
+  self.db.settings.source="auto"
+  if self.BuildPlanBundle then
+    local result,err=self:BuildPlanBundle({historyEntry=entry,reason=entry and "history" or "current"})
     return result and result.bpc or nil,err
   end
-  self.db.settings.source="auto"
-  return self:BuildBPCPlan()
+  return entry and self:GenerateFestergutHistoryPlans(entry) or self:BuildBPCPlan()
 end
 
 function PB:PrepareBQLPlanForUI()
   local entry=self:GetSelectedFestergutHistoryEntry()
-  if entry then
-    local result,err=self:GenerateFestergutHistoryPlans(entry)
+  if self.BuildPlanBundle then
+    local result,err=self:BuildPlanBundle({historyEntry=entry,reason=entry and "history" or "current"})
     return result and result.bql or nil,err
   end
-  return self:GeneratePlan()
+  return entry and self:GenerateFestergutHistoryPlans(entry) or self:GeneratePlan()
 end

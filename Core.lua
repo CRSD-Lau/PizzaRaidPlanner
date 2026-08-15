@@ -8,6 +8,20 @@ function PB:Refresh()
   if self.UpdateUI then self:UpdateUI() end
 end
 
+function PB:PreparePlanBundleSafe(reason)
+  if type(self.BuildPlanBundle)~="function" then return nil,"Atomic plan bundle module is unavailable. Use /reload; restart WoW if the addon was updated while the client was open." end
+  local ok,bundle,err=pcall(self.BuildPlanBundle,self,{reason=reason or "current"})
+  if ok then return bundle,err end
+  return nil,"Plan bundle failed: "..tostring(bundle)
+end
+
+function PB:RunRosterAudibleSafe()
+  if type(self.RunRosterAudible)~="function" then return nil,"Roster audible is unavailable. Use /reload; restart WoW if the addon was updated while the client was open." end
+  local ok,bundle,err=pcall(self.RunRosterAudible,self)
+  if ok then return bundle,err end
+  return nil,"Roster audible failed: "..tostring(bundle)
+end
+
 -- UI and slash-command entry points use these wrappers so a partially loaded
 -- optional feature cannot produce an OnUpdate error loop. The normal history
 -- methods remain the primary path; current-raid planning is the fallback.
@@ -94,6 +108,7 @@ function PB:OnEvent(event, ...)
   elseif event == "PLAYER_LOGIN" then
     if self.UpdateICCState then self:UpdateICCState() end
     self:Refresh()
+    if not (self.db and self.db.latestPlanBundle and self.db.latestPlanBundle.version==PB.VERSION) then self.db.planDirty=true; self.db.planDirtyReason="version" end
     local _,refreshError=self:RefreshSelectedFestergutPlansSafe()
     if refreshError then self:Print(refreshError) end
   elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" or event == "RAID_ROSTER_UPDATE" or event == "PARTY_MEMBERS_CHANGED" or event == "UNIT_PET" then

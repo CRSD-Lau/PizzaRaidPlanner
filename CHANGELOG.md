@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 - 2026-08-15
+
+- Distinguished confirmed Festergut kills from wipes and incomplete pulls. New wipe/pull records remain visible for audit, but only confirmed kills can become DPS Sources or planning benchmarks; existing pre-1.1 history is preserved as clearly labelled legacy kills.
+- Added one atomic BPC+BQL plan bundle with a shared source, roster fingerprint, bundle ID, and revision. Copy views and SavedVariables exports now rebuild the pair together, eliminating mixed cached/current encounter plans.
+- Added `/prp audible` and an in-game **Audible** review for roster changes after Festergut. It scans the current raid, lists incoming/outgoing/spec/role changes, performs a deterministic full replan for large shuffles or critical departures, and prints every changed BPC/BQL position, bite link, and utility/cooldown slot.
+- Kept Festergut as the only DPS benchmark during an audible. Returning players use the selected/current kill only while their class/spec still matches; incoming or spec-swapped DPS may use only that player's own same-class/same-spec historical Festergut result, with provenance shown as current, selected, history, or missing. Missing players are warned instead of receiving an ICC average.
+- Marked a plan dirty whenever the live roster, confirmed Festergut benchmark, ICC session, or planner version no longer matches it. `/reload` preserves the last complete pair as dirty instead of silently replanning; the desktop publisher blocks it, missing benchmark evidence, invalid metadata, and mismatched BPC/BQL bundle IDs before any workbook or Discord update.
+- Added plan revision data to the publisher transaction and duplicate fingerprint. Audible Discord posts are labelled as an updated revision that replaces the prior plan.
+- Added Lua, JavaScript, and PowerShell regression coverage for confirmed-kill gating, wipe retention, roster shuffles, historical fallback provenance, atomic exports, and publisher rejection paths.
+
 ## 1.0.1 - 2026-08-13
 
 - Renumbered BPC melee center-out in symmetric pairs: M1/M2 retain Retribution priority, M3/M4 use Festergut output and return mobility, M5-M8 complete the normal eight-player footprint, and M9/M10 are now the obvious far-edge overflow pair.

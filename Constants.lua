@@ -1,8 +1,8 @@
 PizzaRaidPlanner = PizzaRaidPlanner or {}
 local PB = PizzaRaidPlanner
 
-PB.VERSION = "1.0.1"
-PB.SCHEMA_VERSION = 12
+PB.VERSION = "1.1.0"
+PB.SCHEMA_VERSION = 13
 PB.MAX_SEGMENTS = 20
 PB.MAX_FESTERGUT_HISTORY = 52
 PB.SEGMENT_GRACE = 8
@@ -98,6 +98,7 @@ PB.DEFAULTS = {
   capabilityOverrides = {}, capabilityEvidence = {}, competenceOverrides = {}, utilityPriorities = {},
   segments = {}, selectedSegmentId = nil, iccSession = {}, encounterHistory = {}, latestPlan = nil,
   festergutHistory = {}, selectedFestergutHistoryId = nil,
+  latestPlanBundle = nil, planDirty = true, planDirtyReason = "unbuilt", pendingRosterDiff = nil, lastAudible = nil,
   lastRaidRoster = {},
   debugLog = {},
 }
